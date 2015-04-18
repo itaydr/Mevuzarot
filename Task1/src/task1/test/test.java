@@ -13,6 +13,7 @@ public class test {
 	public static PropertiesCredentials Credentials;
 	public static AmazonS3 S3;
 	public static String bucketName = "TEST Bucket";
+	// @itay: this file is not commited because github is public. Make sure you copy it before testing.
 	public static String propertiesFilePath = "src/task1/test/_itay_creds.properties";
 	public static String fileToUploadPath = "src/task1/test/test.java";
 	
