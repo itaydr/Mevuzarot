@@ -12,8 +12,8 @@ public class test {
 	
 	public static PropertiesCredentials Credentials;
 	public static AmazonS3 S3;
-	public static String bucketName = "TEST Bucket";
-	// @itay: this file is not commited because github is public. Make sure you copy it before testing.
+	public static String bucketName = "mevuzarot.task1";
+	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
 	public static String propertiesFilePath = "src/task1/test/_itay_creds.properties";
 	public static String fileToUploadPath = "src/task1/test/test.java";
 	
@@ -22,7 +22,7 @@ public class test {
 			System.out.println("Credentials created.");
 			S3 = new AmazonS3Client(Credentials);
 			System.out.println("AmazonS3Client created.");
-			// If the bucket doesnt exist - will create it.
+			// If the bucket doesn't exist - will create it.
 			// Notice - this will create it in the default region : Region.US_Standard
 			if (!S3.doesBucketExist(bucketName)) {
 				S3.createBucket(bucketName);
