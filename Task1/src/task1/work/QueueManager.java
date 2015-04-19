@@ -81,21 +81,13 @@ public class QueueManager {
 	private void sendMessage(String message) {
 		
 		HashMap<String, MessageAttributeValue> messageAttributes = new HashMap<>();
-	    messageAttributes.put("to", new MessageAttributeValue().withDataType("String").withStringValue(uid));
-		
+		messageAttributes.put("from", new MessageAttributeValue().withDataType("String").withStringValue(uid));
+		messageAttributes.put("to", new MessageAttributeValue().withDataType("String").withStringValue("remoteManager"));
 		
 		SendMessageRequest send = new SendMessageRequest(localQueueUrl, message);
 		send.withMessageAttributes(messageAttributes);
 			
 		sqs.sendMessage(send);
-	}
-	
-	private void attachAttributeToMessage (SendMessageRequest msg, String name, String value) {
-		MessageAttributeValue attr = new MessageAttributeValue();
-		attr.setStringValue(value);
-		attr.setDataType("String");
-		msg.addMessageAttributesEntry(name, attr);
-		
 	}
 	
 	public void terminate() {
@@ -110,25 +102,23 @@ public class QueueManager {
 
 		ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest();
 		receiveMessageRequest.withQueueUrl(localQueueUrl);
-		ArrayList<String> attrs = new ArrayList<String>();
-		attrs.add("to");
-		receiveMessageRequest.withMessageAttributeNames(attrs);
+		receiveMessageRequest.withMessageAttributeNames(".*");
+
 		List<Message> messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
         
         if (messages == null || messages.isEmpty()) return null;
         
         List<Message> messagesForMe = new ArrayList<Message>();
         for (Message msg : messages) {
-        	String to = msg.getAttributes().get("to");
-        	if (to != null && to.equals(uid)) {
+        	MessageAttributeValue to = msg.getMessageAttributes().get("to");
+        	if (to != null && to.getStringValue().equals(uid)) {
         		messagesForMe.add(msg);
-        		//Delete the message
         		sqs.deleteMessage(new DeleteMessageRequest().withQueueUrl(localQueueUrl).withReceiptHandle(msg.getReceiptHandle()));
         	}
         }
         
         
-        QueueManager.printMessages(messages);
+        QueueManager.printMessages(messagesForMe);
         
         return messagesForMe;
 	}
