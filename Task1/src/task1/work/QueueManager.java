@@ -1,8 +1,10 @@
 package task1.work;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.Map.Entry;
+import java.util.HashMap;
 
 import com.amazonaws.AmazonClientException;
 import com.amazonaws.AmazonServiceException;
@@ -14,17 +16,21 @@ import com.amazonaws.services.sqs.model.DeleteMessageRequest;
 import com.amazonaws.services.sqs.model.DeleteQueueRequest;
 import com.amazonaws.services.sqs.model.GetQueueUrlRequest;
 import com.amazonaws.services.sqs.model.Message;
+import com.amazonaws.services.sqs.model.MessageAttributeValue;
 import com.amazonaws.services.sqs.model.ReceiveMessageRequest;
 import com.amazonaws.services.sqs.model.SendMessageRequest;
+import com.amazonaws.services.sqs.model.QueueDoesNotExistException;
+import com.amazonaws.services.sqs.model.QueueDeletedRecentlyException;
 
 public class QueueManager {
 
-	private static String QUEUE_IDENTIFIER = "mevuzarot.task1.localqueue";
+	private static String QUEUE_IDENTIFIER = "mevuzarot_task1_localqueue";
 	private static QueueManager sInstance;
 	private static Object LOCK = new Object();
 	
 	private AmazonSQS sqs;
 	private String localQueueUrl;
+	private String uid;
 	
 	public static QueueManager sharedInstance () {
 		if (sInstance == null) {
@@ -39,7 +45,7 @@ public class QueueManager {
 	}
 	
 	public QueueManager () {
-		
+		uid = "" + UUID.randomUUID();
 	}
 	
 	public void init(PropertiesCredentials creds) {
@@ -50,16 +56,21 @@ public class QueueManager {
 	
 	private void initLocalQueue () {
 
-        GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_IDENTIFIER);
-        String addy = sqs.getQueueUrl(getQueueUrlRequest).getQueueUrl();
+		try {
+			GetQueueUrlRequest getQueueUrlRequest = new GetQueueUrlRequest(QUEUE_IDENTIFIER);
+			this.localQueueUrl = sqs.getQueueUrl(getQueueUrlRequest).getQueueUrl();
+		}
+		catch (QueueDoesNotExistException ex) {
+			this.localQueueUrl = null;
+		}
+		catch (QueueDeletedRecentlyException ex) {
+			this.localQueueUrl = null;
+		}
         
-        if (addy == null) {
+        if (this.localQueueUrl == null) {
     		CreateQueueRequest createQueueRequest = new CreateQueueRequest(QUEUE_IDENTIFIER);
             String myQueueUrl = sqs.createQueue(createQueueRequest).getQueueUrl();
             this.localQueueUrl = myQueueUrl;
-        }
-        else {
-        	this.localQueueUrl = addy;
         }
 	}
 	
@@ -68,7 +79,23 @@ public class QueueManager {
 	}
 	
 	private void sendMessage(String message) {
-		sqs.sendMessage(new SendMessageRequest(localQueueUrl, message));
+		
+		HashMap<String, MessageAttributeValue> messageAttributes = new HashMap<>();
+	    messageAttributes.put("to", new MessageAttributeValue().withDataType("String").withStringValue(uid));
+		
+		
+		SendMessageRequest send = new SendMessageRequest(localQueueUrl, message);
+		send.withMessageAttributes(messageAttributes);
+			
+		sqs.sendMessage(send);
+	}
+	
+	private void attachAttributeToMessage (SendMessageRequest msg, String name, String value) {
+		MessageAttributeValue attr = new MessageAttributeValue();
+		attr.setStringValue(value);
+		attr.setDataType("String");
+		msg.addMessageAttributesEntry(name, attr);
+		
 	}
 	
 	public void terminate() {
@@ -80,12 +107,30 @@ public class QueueManager {
 	}
 	
 	public List<Message> waitForMessages() {
-		ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest(localQueueUrl);
-        List<Message> messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
+
+		ReceiveMessageRequest receiveMessageRequest = new ReceiveMessageRequest();
+		receiveMessageRequest.withQueueUrl(localQueueUrl);
+		ArrayList<String> attrs = new ArrayList<String>();
+		attrs.add("to");
+		receiveMessageRequest.withMessageAttributeNames(attrs);
+		List<Message> messages = sqs.receiveMessage(receiveMessageRequest).getMessages();
+        
+        if (messages == null || messages.isEmpty()) return null;
+        
+        List<Message> messagesForMe = new ArrayList<Message>();
+        for (Message msg : messages) {
+        	String to = msg.getAttributes().get("to");
+        	if (to != null && to.equals(uid)) {
+        		messagesForMe.add(msg);
+        		//Delete the message
+        		sqs.deleteMessage(new DeleteMessageRequest().withQueueUrl(localQueueUrl).withReceiptHandle(msg.getReceiptHandle()));
+        	}
+        }
+        
         
         QueueManager.printMessages(messages);
         
-        return messages;
+        return messagesForMe;
 	}
 	
 	private static void printMessages (List<Message> messages) {

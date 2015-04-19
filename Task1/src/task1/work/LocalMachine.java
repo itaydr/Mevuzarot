@@ -37,9 +37,15 @@ public class LocalMachine {
 	
 	public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException{
 			
+			if (args.length == 0) {
+				System.out.println("Must provide arguments for input and output");
+				return;
+			}
+		
 			LocalMachine.initS3();
 			
 			String fileToUploadPath = args[0];
+			System.out.println("Input - " + fileToUploadPath);
 			String pathInS3 = LocalMachine.uploadFileToS3(fileToUploadPath);
 			
 			QueueManager.sharedInstance().init(Credentials);
@@ -51,16 +57,30 @@ public class LocalMachine {
 	}
 	
 	private static void loopForMessages () {
-		List<Message> messages;
-		
-		while (true) {
-			messages = QueueManager.sharedInstance().waitForMessages();
-			for (Message msg : messages) {
-				if (msg.getBody().equals("terminate")) {
-					LocalMachine.shutDownRemoteManager();
+		new Thread(new Runnable() {
+			
+			@Override
+			public void run() {
+				List<Message> messages;
+				
+				while (true) {
+					messages = QueueManager.sharedInstance().waitForMessages();
+					if (messages != null) {
+						for (Message msg : messages) {
+							if (msg.getBody().equals("terminate")) {
+								LocalMachine.shutDownRemoteManager();
+							}
+						}
+					}
+					try {
+						Thread.sleep(1000);
+					} catch (InterruptedException e) {}
 				}
+				
+				
 			}
-		}
+		}).start();
+		
 	}
 	
 	private static String uploadFileToS3 (String fileToUploadPath) {
