@@ -11,6 +11,18 @@ import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.AmazonS3Client;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.sqs.model.Message;
+import com.amazonaws.services.ec2.AmazonEC2;
+import com.amazonaws.services.ec2.AmazonEC2Client;
+import com.amazonaws.services.ec2.model.CreateTagsRequest;
+import com.amazonaws.services.ec2.model.DeleteTagsRequest;
+import com.amazonaws.services.ec2.model.DescribeInstancesResult;
+import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.InstanceType;
+import com.amazonaws.services.ec2.model.Reservation;
+import com.amazonaws.services.ec2.model.RunInstancesRequest;
+import com.amazonaws.services.ec2.model.Tag;
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.AmazonServiceException;
 
 public class LocalMachine {
 	
@@ -19,6 +31,9 @@ public class LocalMachine {
 	public static String bucketName = "mevuzarot.task1";
 	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
 	public static String propertiesFilePath = "src/task1/work/_itay_creds.properties";
+	
+	private static AmazonEC2 ec2;
+	private static Instance remoteManager;
 	
 	public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException{
 			
@@ -30,6 +45,8 @@ public class LocalMachine {
 			QueueManager.sharedInstance().init(Credentials);
 			QueueManager.sharedInstance().startJobWithFile(pathInS3);
 			
+			LocalMachine.startUpRemoteManager();
+			
 			LocalMachine.loopForMessages();
 	}
 	
@@ -38,7 +55,11 @@ public class LocalMachine {
 		
 		while (true) {
 			messages = QueueManager.sharedInstance().waitForMessages();
-			// Process messages.
+			for (Message msg : messages) {
+				if (msg.getBody().equals("terminate")) {
+					LocalMachine.shutDownRemoteManager();
+				}
+			}
 		}
 	}
 	
@@ -75,5 +96,65 @@ public class LocalMachine {
 		else {
 			System.out.println("Bucket exist.");
 		}
+	}
+	
+	private static boolean startUpRemoteManager () throws FileNotFoundException, IOException {
+		boolean manager_exists = false;
+		
+		AWSCredentials credentials = new PropertiesCredentials(new FileInputStream(propertiesFilePath));
+		ec2 = new AmazonEC2Client(credentials);
+
+		DescribeInstancesResult result = ec2.describeInstances();
+		List<Reservation> reservations = result.getReservations();
+
+		for (Reservation reservation : reservations) {
+			List<Instance> instances = reservation.getInstances();
+			
+			for (Instance instance : instances) {
+				
+				if ( instance.getTags().contains(new Tag("Manager", "True")) ) {
+					manager_exists = true;
+		    	  }	
+		      }	
+		 }	
+		
+		if (!manager_exists) {
+			try {
+				// Basic 32-bit Amazon Linux AMI 1.0 (AMI Id: ami-08728661)
+				RunInstancesRequest request = new RunInstancesRequest("ami-08728661", 1, 1);
+				request.setInstanceType(InstanceType.T1Micro.toString());
+				List<Instance> instances = ec2.runInstances(request).getReservation().getInstances();
+				System.out.println("Launch instances: " + instances);
+				
+				remoteManager =  instances.get(0);
+				
+				//System.out.println(instances.get(0).getInstanceId());
+				CreateTagsRequest createTagsRequest=new CreateTagsRequest().withResources(instances.get(0).getInstanceId()).withTags(new Tag("Manager","True"));
+				ec2.createTags(createTagsRequest);
+				
+				return true;
+				
+			} catch (AmazonServiceException ase) {
+				System.out.println("Caught Exception: " + ase.getMessage());
+				System.out.println("Reponse Status Code: " + ase.getStatusCode());
+				System.out.println("Error Code: " + ase.getErrorCode());
+				System.out.println("Request ID: " + ase.getRequestId());
+			}
+		}
+		
+		return false;
+	}
+	
+	private static boolean shutDownRemoteManager () {
+		
+		if (remoteManager != null) {
+			DeleteTagsRequest createTagsRequest=new DeleteTagsRequest().withResources(remoteManager.getInstanceId()).withTags(new Tag("Manager","True"));
+			ec2.deleteTags(createTagsRequest);
+			System.out.println("tag removed for Manager");
+			
+			return true;
+		}
+	
+		return false;
 	}
 }
