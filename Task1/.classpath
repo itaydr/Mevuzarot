@@ -19,5 +19,6 @@
 	<classpathentry kind="lib" path="/mnt/hgfs/Studies/Mevuzarot/AWS/third-party/spring-3.0/spring-beans-3.0.7.jar"/>
 	<classpathentry kind="lib" path="/mnt/hgfs/Studies/Mevuzarot/AWS/third-party/spring-3.0/spring-context-3.0.7.jar"/>
 	<classpathentry kind="lib" path="/mnt/hgfs/Studies/Mevuzarot/AWS/third-party/spring-3.0/spring-core-3.0.7.jar"/>
+	<classpathentry kind="lib" path="/mnt/hgfs/Studies/Mevuzarot/AWS/aws-java-sdk-1.9.31-javadoc.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
