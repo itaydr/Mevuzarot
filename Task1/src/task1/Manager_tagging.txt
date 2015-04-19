@@ -1,0 +1,88 @@
+import java.io.FileInputStream;
+import com.amazonaws.auth.PropertiesCredentials;
+import java.util.List;
+import com.amazonaws.AmazonServiceException;
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.services.ec2.AmazonEC2;
+import com.amazonaws.services.ec2.AmazonEC2Client;
+import com.amazonaws.services.ec2.model.CreateTagsRequest;
+import com.amazonaws.services.ec2.model.DeleteTagsRequest;
+import com.amazonaws.services.ec2.model.DescribeInstancesResult;
+import com.amazonaws.services.ec2.model.Instance;
+import com.amazonaws.services.ec2.model.InstanceType;
+import com.amazonaws.services.ec2.model.Reservation;
+import com.amazonaws.services.ec2.model.RunInstancesRequest;
+import com.amazonaws.services.ec2.model.Tag;
+
+
+public class SampleS3{
+	//public static PropertiesCredentials Credentials;
+	//public static AmazonS3 S3;
+	public static String propertiesFilePath = "/home/asaf/workspace/SampleAWS/_asaf_creds.properties";
+
+    public static void main(String[] args) throws Exception {
+	AmazonEC2 ec2;
+	boolean manager_exists = false;
+	
+	AWSCredentials credentials = new PropertiesCredentials(
+			new FileInputStream(propertiesFilePath));
+			//SampleS3.class.getResourceAsStream("/home/asaf/workspace/SampleAWS/_asaf_creds.properties"));
+    ec2 = new AmazonEC2Client(credentials);
+
+	DescribeInstancesResult result = ec2.describeInstances();
+	List<Reservation> reservations = result.getReservations();
+
+	for (Reservation reservation : reservations) {
+		List<Instance> instances = reservation.getInstances();
+		
+		for (Instance instance : instances) {
+			
+			if ( instance.getTags().contains(new Tag("Manager", "True")) ) {
+				manager_exists = true;
+	    	  }	
+	      }	
+	 }	
+	 
+	if (false == manager_exists) {
+		try {
+			// Basic 32-bit Amazon Linux AMI 1.0 (AMI Id: ami-08728661)
+			RunInstancesRequest request = new RunInstancesRequest("ami-08728661", 1, 1);
+			request.setInstanceType(InstanceType.T1Micro.toString());
+			List<Instance> instances = ec2.runInstances(request).getReservation().getInstances();
+			System.out.println("Launch instances: " + instances);
+			
+			//System.out.println(instances.get(0).getInstanceId());
+			CreateTagsRequest createTagsRequest=new CreateTagsRequest().withResources(instances.get(0).getInstanceId()).withTags(new Tag("Manager","True"));
+			ec2.createTags(createTagsRequest);
+			System.out.println("Created tag for Manager");
+			
+		} catch (AmazonServiceException ase) {
+			System.out.println("Caught Exception: " + ase.getMessage());
+			System.out.println("Reponse Status Code: " + ase.getStatusCode());
+			System.out.println("Error Code: " + ase.getErrorCode());
+			System.out.println("Request ID: " + ase.getRequestId());
+		}
+	 } else {
+		 System.out.println("Manager already exists");
+		 System.out.println("removing...");
+		 
+		 for (Reservation reservation : reservations) {
+				List<Instance> instances = reservation.getInstances();
+				
+				for (Instance instance : instances) {
+					
+					if ( instance.getTags().contains(new Tag("Manager", "True")) ) {
+						DeleteTagsRequest createTagsRequest=new DeleteTagsRequest().withResources(instances.get(0).getInstanceId()).withTags(new Tag("Manager","True"));
+						ec2.deleteTags(createTagsRequest);
+						System.out.println("tag removed for Manager");
+			    	  }	
+			      }	
+			 }	
+			
+		 
+		 
+	 }
+	  
+	 System.out.println("done");
+	}
+}
