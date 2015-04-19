@@ -1,8 +1,12 @@
+package task1;
+
+
 import java.io.File;
 import java.io.IOException;
-
+import task1.work.QueueManager;
 
 public class ManagerMain {
+
 
 	/**
 	 * @param args
@@ -20,6 +24,9 @@ public class ManagerMain {
 		} // throws IOException
 	    
 	    System.out.println("done");
+	    
+	    new RemoteManager().init();
 	}
+
 
 }
