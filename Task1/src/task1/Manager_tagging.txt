@@ -1,6 +1,16 @@
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+
 import com.amazonaws.auth.PropertiesCredentials;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
+
+import org.apache.commons.codec.binary.Base64;
+
 import com.amazonaws.AmazonServiceException;
 import com.amazonaws.auth.AWSCredentials;
 import com.amazonaws.services.ec2.AmazonEC2;
@@ -13,6 +23,7 @@ import com.amazonaws.services.ec2.model.InstanceType;
 import com.amazonaws.services.ec2.model.Reservation;
 import com.amazonaws.services.ec2.model.RunInstancesRequest;
 import com.amazonaws.services.ec2.model.Tag;
+import com.amazonaws.services.ec2.model.TerminateInstancesRequest;
 
 
 public class SampleS3{
@@ -28,7 +39,10 @@ public class SampleS3{
 			new FileInputStream(propertiesFilePath));
 			//SampleS3.class.getResourceAsStream("/home/asaf/workspace/SampleAWS/_asaf_creds.properties"));
     ec2 = new AmazonEC2Client(credentials);
-
+    
+    terminate_instance("i-e1e4cfce");
+    return;
+/*
 	DescribeInstancesResult result = ec2.describeInstances();
 	List<Reservation> reservations = result.getReservations();
 
@@ -46,8 +60,13 @@ public class SampleS3{
 	if (false == manager_exists) {
 		try {
 			// Basic 32-bit Amazon Linux AMI 1.0 (AMI Id: ami-08728661)
-			RunInstancesRequest request = new RunInstancesRequest("ami-08728661", 1, 1);
-			request.setInstanceType(InstanceType.T1Micro.toString());
+			//RunInstancesRequest request = new RunInstancesRequest("ami-08728661", 1, 1);
+			RunInstancesRequest request = new RunInstancesRequest("ami-146e2a7c", 1, 1);
+			//request.setInstanceType(InstanceType.T1Micro.toString());
+			request.setInstanceType(InstanceType.T2Micro.toString());
+			request.setKeyName("Mevuzarot");
+			request.withSecurityGroups("in-22.out-all");
+			request.setUserData(getUserDataScript());
 			List<Instance> instances = ec2.runInstances(request).getReservation().getInstances();
 			System.out.println("Launch instances: " + instances);
 			
@@ -84,5 +103,112 @@ public class SampleS3{
 	 }
 	  
 	 System.out.println("done");
+*/
+    //-----------------------------------------
+    //-----------------------------------------
+    //-----------------------------------------
+    //-----------------------------------------
+	
+	
+	/*
+	public static String bucketName = "yaa";
+	public static String propertiesFilePath = "/home/asaf/workspace/SampleAWS/_asaf_creds.properties";
+	public static String fileToUploadPath = "/home/asaf/workspace/SampleAWS/testing.txt";
+	
+	public static void main(String[] args) throws FileNotFoundException,
+		IOException, InterruptedException{
+		
+		Credentials = new PropertiesCredentials(
+				new FileInputStream(propertiesFilePath));
+			System.out.println("Credentials created.");
+			
+		S3 = new AmazonS3Client(Credentials);
+		
+		System.out.println("AmazonS3Client created.");
+		// If the bucket doesnt exist - will create it.
+		// Notice - this will create it in the default region :Region.US_Standard
+		if (!S3.doesBucketExist(bucketName)) {
+			S3.createBucket(bucketName);
+		}
+		System.out.println("Bucket exist.");
+		File f = new File(fileToUploadPath);
+		PutObjectRequest por = new PutObjectRequest(bucketName, f.getName(),
+				f);
+		// 	Upload the file
+		S3.putObject(por);
+		System.out.println("File uploaded.");
+		*/
 	}
+    
+    
+    
+
+    private static void terminate_instance(String image_id) throws FileNotFoundException, IOException {
+
+    	AmazonEC2 ec2;
+    	
+    	AWSCredentials credentials = new PropertiesCredentials(
+    			new FileInputStream(propertiesFilePath));
+    			//SampleS3.class.getResourceAsStream("/home/asaf/workspace/SampleAWS/_asaf_creds.properties"));
+        ec2 = new AmazonEC2Client(credentials);
+
+    	
+    	TerminateInstancesRequest request = new TerminateInstancesRequest();
+    	request.withInstanceIds(image_id);
+		//request.setInstanceType(InstanceType.T1Micro.toString());
+    	ec2.terminateInstances(request);
+		
+    	System.out.println(image_id + " killed!");
+	}
+
+
+
+
+	private static String getUserDataScript(){
+        ArrayList<String> lines = new ArrayList<String>();
+        
+        // start of script
+        lines.add("#!/bin/sh");
+        lines.add("BIN_DIR=/tmp");
+        lines.add("AWS_ACCESS_KEY_ID=AKIAJKWVEQCBE3JKQRVQ");
+        lines.add("AWS_SECRET_ACCESS_KEY=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");
+        lines.add("AWS_DEFAULT_REGION=us-east-1");
+        lines.add("# Make depenedencies");
+        lines.add("mkdir -p $BIN_DIR/dependencies");
+        lines.add("cd $BIN_DIR/dependencies");
+        lines.add("wget http://sdk-for-java.amazonwebservices.com/latest/aws-java-sdk.zip");
+        lines.add("unzip aws-java-sdk.zip");
+        lines.add("mv aws-java-sdk-*/ aws-java-sdk");
+        lines.add("wget http://www.us.apache.org/dist//commons/io/binaries/commons-io-2.4-bin.zip");
+        lines.add("unzip commons-io-2.4-bin.zip");
+        lines.add("# Make main app");
+        lines.add("cd $BIN_DIR");
+        lines.add("mkdir -p $BIN_DIR/bin/jar");
+        lines.add("export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION");
+        lines.add("aws s3 cp s3://mevuzarot.task1/manager_test.jar $BIN_DIR/bin/jar");
+        lines.add("echo accessKey=$AWS_ACCESS_KEY_ID > $BIN_DIR/rootkey.csv");
+        lines.add("echo secretKey=$AWS_SECRET_ACCESS_KEY >> $BIN_DIR/rootkey.csv");
+        lines.add("# Java would compile the following line:");
+        lines.add("java -cp $BIN_DIR/bin/jar/manager_test.jar ManagerMain");
+        // end of script
+        /* orig
+        lines.add("#! /bin/bash");
+        lines.add("curl http://www.google.com > google.html");
+        lines.add("shutdown -h 0"); */
+        String str = new String(Base64.encodeBase64(join(lines, "\n").getBytes()));
+        return str;
+    }
+
+    static String join(Collection<String> s, String delimiter) {
+        StringBuilder builder = new StringBuilder();
+        Iterator<String> iter = s.iterator();
+        while (iter.hasNext()) {
+            builder.append(iter.next());
+            if (!iter.hasNext()) {
+                break;
+            }
+            builder.append(delimiter);
+        }
+        return builder.toString();
+    }
 }
