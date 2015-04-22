@@ -17,6 +17,10 @@ public class LocalMachine {
 	
 	private static PropertiesCredentials Credentials;
 	
+	private static final String MANAGER_JAR_NAME = "Manager.jar";
+	private static final String MANAGER_JAR_MAIN_CLASS = "task1.Manager";
+	private static String MANAGER_JAR_PARAMETERS;
+	
 	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
 	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
 	private final static String bucketName = "mevuzarot.task1";
@@ -42,6 +46,7 @@ public class LocalMachine {
 					System.out.println("input file does not exists!");
 					return;
 				}
+				MANAGER_JAR_PARAMETERS = args[1];
 			}			
 			// initialize credentials
 			try {
@@ -61,7 +66,10 @@ public class LocalMachine {
 			ec2 = new EC2Util(Credentials);
 			
 			// create or find manager instance
-//			LocalMachine.startUpRemoteManager();
+			if (false == LocalMachine.startUpRemoteManager(args[1])) {
+				System.out.println("Failed to get Manager instance.. quitting");
+				return;
+			}
 			
 			// upload job file to S3
 			String fileToUploadPath = args[0];
@@ -94,7 +102,7 @@ public class LocalMachine {
 					return;
 				}
 				
-//				shutDownRemoteManager();
+				shutDownRemoteManager();
 			}
 			
 	}
@@ -143,14 +151,19 @@ public class LocalMachine {
 		}		
 	}
 	
-	private static boolean startUpRemoteManager () {
+	private static boolean startUpRemoteManager (String n) {
 		try {
 			remoteManagerInstance = ec2.getManagerInstance();
 			if (null == remoteManagerInstance) {
-				remoteManagerInstance = ec2.createNode(1).get(0);
+				String managerStartupScript = UserDataScriptsClass.getManagerStartupScript(
+						MANAGER_JAR_NAME,
+						MANAGER_JAR_MAIN_CLASS,
+						MANAGER_JAR_PARAMETERS);
+				remoteManagerInstance = ec2.createNode(1, managerStartupScript).get(0);
 				ec2.setManagerTag(remoteManagerInstance);
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			return false;
 		}
 		

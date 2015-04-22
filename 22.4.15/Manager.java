@@ -20,6 +20,13 @@ public class Manager {
 	private static PropertiesCredentials Credentials;
 	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
 	
+	private static final String WORKER_JAR_NAME = "Worker.jar";
+	private static final String WORKER_JAR_MAIN_CLASS = "task1.Worker";
+	private static final String WORKER_JAR_PARAMETERS = "";
+	
+	private static String mWorkerStartupScript;
+	
+	
 	private static QueueUtil inboundQueueFromLocalAndWorkers;
 	private static QueueUtil outboundQueueToWorkers;
 	private static QueueUtil outboundQueueToLocalMachines;
@@ -85,7 +92,6 @@ public class Manager {
 		
 		public void markErrorURL(String url){
 			urlListController.put(url, null);
-			//unfinishedURLs  = 4;
 			unfinishedURLs--;
 			Manager.currentRunningURLs--;
 		}
@@ -114,6 +120,9 @@ public class Manager {
 		currentRunningURLs = 0;
 		jobs = new ArrayList<Job>();
 		workers = new ArrayList<Instance>();
+		mWorkerStartupScript = UserDataScriptsClass.getManagerStartupScript(WORKER_JAR_NAME, 
+				WORKER_JAR_MAIN_CLASS, 
+				WORKER_JAR_PARAMETERS);
 
 		// initialize credentials
 		try {
@@ -154,9 +163,9 @@ public class Manager {
 		
 		// Terminate all workers
 		System.out.println("Sending termination signals to workers...");
-//		for (int i = 0; i < workers.size(); i++) { //TODO change
+		for (int i = 0; i < workers.size(); i++) {
 			outboundQueueToWorkers.sendTerminationToWorks();
-//		}
+		}
 			
 		Thread.sleep(5 * 1000); // sleep 5 sec to let the queue refresh
 		System.out.println("waiting for workers to terminate...");	
@@ -166,10 +175,10 @@ public class Manager {
 		System.out.println("all got tremination signals, waiting 30 seconds and strating to terminate machine");
 		Thread.sleep(30 * 1000); // sleep for 30 sec
 		
-/* //TODO change
+
 		for ( Instance i : workers ) {
 			ec2.terminateMachine(i);
-}*/
+		}
 		
 		System.out.println("Sending shutdown ACK to local machine");
 		outboundQueueToLocalMachines.sendTerminationACK(mLocalMachineACK);
@@ -217,8 +226,7 @@ public class Manager {
 							newWorkersToCreate +=1;
 						}
 						System.out.println("should create: " + newWorkersToCreate + " new workers");
-//TODO change						
-//						workers.addAll(ec2.createNode(newWorkersToCreate);
+						workers.addAll(ec2.createNode(newWorkersToCreate,mWorkerStartupScript));
 					}
 				}
 			}
