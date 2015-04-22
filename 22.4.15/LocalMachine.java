@@ -54,10 +54,9 @@ public class LocalMachine {
 				return;
 			}
 
-			String temp = "eaf68155-6e1b-47ac-b441-854fb2487bde";
 			// initialize queues, S3 and ec2_client
-			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, temp);
-			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, temp);
+			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, null);
+			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, null);
 			s3_client = new S3Util(Credentials, bucketName);
 			ec2 = new EC2Util(Credentials);
 			
@@ -68,7 +67,7 @@ public class LocalMachine {
 			String fileToUploadPath = args[0];
 			System.out.println("Input - " + fileToUploadPath);
 			String pathInS3 = s3_client.uploadFileToS3(fileToUploadPath);
-/*			
+
 			// send start job message to manager
 			outboundQueueToManager.startJobWithFile(pathInS3);
 			
@@ -81,13 +80,12 @@ public class LocalMachine {
 			String summaryPath = receivedMessage.getBody();
 			ArrayList<String> thumbnailsUrls = s3_client.getFileContentFromS3(summaryPath);
 			createHTMLFile(thumbnailsUrls, null);
-*/			
+			
 			// send termination message
-			//TODO change!
-			if(args[2].equals("terminate") || true) {
+			if(args[2].equals("terminate")) {
 				outboundQueueToManager.sendTerminationSignal();
 				// wait for manager to terminate
-				Message receivedMessage = LocalMachine.loopForSingleMessage();
+				receivedMessage = LocalMachine.loopForSingleMessage();
 				if (! ( receivedMessage.getBody().equals(QueueUtil.MSG_TERMINATE) )) {
 					System.out.println("Manager did not send us termination ACK... ?!?");
 					ArrayList<Message> tempList = new ArrayList<Message>();
@@ -96,7 +94,7 @@ public class LocalMachine {
 					return;
 				}
 				
-				//shutDownRemoteManager();
+//				shutDownRemoteManager();
 			}
 			
 	}
@@ -134,17 +132,12 @@ public class LocalMachine {
 		while (true) {
 			messages = inboundQueueFromManager.waitForMessages(1);
 			if (messages != null) {
+				System.out.println("");
 				QueueUtil.debugMessagesForMe(messages);
 				return messages.get(0);
-				/*
-				for (Message msg : messages) {
-					if (msg.getBody().equals("terminate")) {
-						LocalMachine.shutDownRemoteManager();
-					}
-				}*/
 			}
 			try {
-				System.out.println("No message for us... sleeping");
+				System.out.print(".");
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {}
 		}		

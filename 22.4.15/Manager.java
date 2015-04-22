@@ -39,7 +39,9 @@ public class Manager {
 	private static ArrayList<Job> jobs;
 	private static int n;
 	
+	@SuppressWarnings("unused")
 	private static int currentRunningURLs;
+	private static String mLocalMachineACK;
 	
 	private static class Job {
 		private String localMachineID;
@@ -134,6 +136,7 @@ public class Manager {
 		while (false == mTerminated || jobs.size() != 0) {
 			List<Message> messages = inboundQueueFromLocalAndWorkers.waitForMessages();
 			if (messages != null) {
+				System.out.println("");
 				QueueUtil.debugMessagesForMe(messages);
 				for (Message msg : messages) {
 					if (false == handleMessage(msg)) {
@@ -143,25 +146,36 @@ public class Manager {
 				}
 			} else {
 				try {
-					System.out.println("queue did not blocked us...");
+					System.out.print(".");
 					Thread.sleep(1 * 1000); // sleep 1 sec
 				} catch (InterruptedException e) {}
 			}
 		}
 		
 		// Terminate all workers
-		//for (int i = 0; i < workers.size(); i++) {
+		System.out.println("Sending termination signals to workers...");
+//		for (int i = 0; i < workers.size(); i++) { //TODO change
 			outboundQueueToWorkers.sendTerminationToWorks();
-		//}
+//		}
+			
+		Thread.sleep(5 * 1000); // sleep 5 sec to let the queue refresh
+		System.out.println("waiting for workers to terminate...");	
 		while ( 0 != outboundQueueToWorkers.queryNumberOfMessagesInQueue() ){
 			Thread.sleep(5 * 1000); // sleep 5 sec
 		}
-		
+		System.out.println("all got tremination signals, waiting 30 seconds and strating to terminate machine");
 		Thread.sleep(30 * 1000); // sleep for 30 sec
 		
+/* //TODO change
 		for ( Instance i : workers ) {
 			ec2.terminateMachine(i);
-		}
+}*/
+		
+		System.out.println("Sending shutdown ACK to local machine");
+		outboundQueueToLocalMachines.sendTerminationACK(mLocalMachineACK);
+		
+		System.out.println("shutting down..");
+		return;
 	}
 	
 	private static boolean handleMessage(Message msg) {
@@ -174,6 +188,7 @@ public class Manager {
 		String type = value.getStringValue();
 		if (type.equals(QueueUtil.MSG_TERMINATE)) {
 			mTerminated = true;
+			mLocalMachineACK = msg.getMessageAttributes().get("from").getStringValue();
 		}
 		else if (type.equals(QueueUtil.MSG_START_JOB)) {
 			String urlListinS3 		= msg.getBody();
@@ -202,7 +217,8 @@ public class Manager {
 							newWorkersToCreate +=1;
 						}
 						System.out.println("should create: " + newWorkersToCreate + " new workers");
-						//workers.addAll(ec2.createNode(newWorkersToCreate);
+//TODO change						
+//						workers.addAll(ec2.createNode(newWorkersToCreate);
 					}
 				}
 			}

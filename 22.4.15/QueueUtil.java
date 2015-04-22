@@ -221,4 +221,8 @@ public class QueueUtil {
 	public void sendErrorToManager(String url) {
 		this.sendMessage(url, currentUID, REMOTE_MANAGER_IDENTIFIER, MSG_ERROR_WORK);		
 	}
+
+	public void sendTerminationACK(String mLocalMachineACK) {
+		this.sendMessage(MSG_TERMINATE, REMOTE_MANAGER_IDENTIFIER, mLocalMachineACK, MSG_TERMINATE);
+	}
 }
