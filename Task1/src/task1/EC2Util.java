@@ -19,16 +19,21 @@ public class EC2Util {
 	private PropertiesCredentials Credentials;
 	private AmazonEC2 ec2;
 	private static final String instancesName = "ami-146e2a7c";
-	private static final String instancesType = InstanceType.T1Micro.toString();
+	private static final String instancesType = InstanceType.T2Micro.toString();
+	private static final String keyPair = "Mevuzarot";
+	private static final String secuirtyGroup = "in-22.out-all";
 	
 	public EC2Util(PropertiesCredentials creds) {
 		Credentials = creds;
 		ec2 = new AmazonEC2Client(Credentials);
 	}
 	
-	public List<Instance> createNode(int numberOfMachines) {
+	public List<Instance> createNode(int numberOfMachines, String userDataScript) {
 		RunInstancesRequest request = new RunInstancesRequest(instancesName, numberOfMachines, numberOfMachines);
 		request.setInstanceType(instancesType);
+		request.setKeyName(keyPair);
+		request.withSecurityGroups(secuirtyGroup);
+		request.setUserData(userDataScript);
 		List<Instance> instances = ec2.runInstances(request).getReservation().getInstances();
 		return instances;
 	}
@@ -60,10 +65,9 @@ public class EC2Util {
 	}
 
 	public void terminateMachine(Instance remoteManagerInstance) {
-		
-//    	TerminateInstancesRequest request = new TerminateInstancesRequest();
-//    	request.withInstanceIds(remoteManagerInstance.getInstanceId());
-//    	ec2.terminateInstances(request);
+    	TerminateInstancesRequest request = new TerminateInstancesRequest();
+    	request.withInstanceIds(remoteManagerInstance.getInstanceId());
+    	ec2.terminateInstances(request);
 	}
 	
 }

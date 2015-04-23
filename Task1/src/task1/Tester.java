@@ -38,7 +38,7 @@ public class Tester {
 	private static AmazonS3 S3;
 	
 	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
-	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
+	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
 	private final static String bucketName = "mevuzarot.task1";
 	
 	

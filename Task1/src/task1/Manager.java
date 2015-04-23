@@ -18,15 +18,22 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 public class Manager {
 
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
+	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
+	
+	private static final String WORKER_JAR_NAME = "Worker.jar";
+	private static final String WORKER_JAR_MAIN_CLASS = "task1.Worker";
+	private static final String WORKER_JAR_PARAMETERS = "";
+	
+	private static String mWorkerStartupScript;
+	
 	
 	private static QueueUtil inboundQueueFromLocalAndWorkers;
 	private static QueueUtil outboundQueueToWorkers;
 	private static QueueUtil outboundQueueToLocalMachines;
 	
-	private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local_2";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER = "mevuzarot_task1_to_manager_2";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER = "mevuzarot_task1_to_workers_2";
+	private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
+	private final static String TO_MANAGER_QUEUE_IDENTIFIER = "mevuzarot_task1_to_manager";
+	private final static String TO_WORKERS_QUEUE_IDENTIFIER = "mevuzarot_task1_to_workers";
 	
 	private final static String REMOTE_MANAGER_IDENTIFIER = "remote_manager";
 	private final static String bucketName = "mevuzarot.task1";
@@ -39,7 +46,9 @@ public class Manager {
 	private static ArrayList<Job> jobs;
 	private static int n;
 	
+	@SuppressWarnings("unused")
 	private static int currentRunningURLs;
+	private static String mLocalMachineACK;
 	
 	private static class Job {
 		private String localMachineID;
@@ -83,7 +92,6 @@ public class Manager {
 		
 		public void markErrorURL(String url){
 			urlListController.put(url, null);
-			//unfinishedURLs  = 4;
 			unfinishedURLs--;
 			Manager.currentRunningURLs--;
 		}
@@ -112,6 +120,9 @@ public class Manager {
 		currentRunningURLs = 0;
 		jobs = new ArrayList<Job>();
 		workers = new ArrayList<Instance>();
+		mWorkerStartupScript = UserDataScriptsClass.getManagerStartupScript(WORKER_JAR_NAME, 
+				WORKER_JAR_MAIN_CLASS, 
+				WORKER_JAR_PARAMETERS);
 
 		// initialize credentials
 		try {
@@ -134,6 +145,7 @@ public class Manager {
 		while (false == mTerminated || jobs.size() != 0) {
 			List<Message> messages = inboundQueueFromLocalAndWorkers.waitForMessages();
 			if (messages != null) {
+				System.out.println("");
 				QueueUtil.debugMessagesForMe(messages);
 				for (Message msg : messages) {
 					if (false == handleMessage(msg)) {
@@ -143,25 +155,36 @@ public class Manager {
 				}
 			} else {
 				try {
-					System.out.println("queue did not blocked us...");
+					System.out.print(".");
 					Thread.sleep(1 * 1000); // sleep 1 sec
 				} catch (InterruptedException e) {}
 			}
 		}
 		
 		// Terminate all workers
-		//for (int i = 0; i < workers.size(); i++) {
+		System.out.println("Sending termination signals to workers...");
+		for (int i = 0; i < workers.size(); i++) {
 			outboundQueueToWorkers.sendTerminationToWorks();
-		//}
+		}
+			
+		Thread.sleep(5 * 1000); // sleep 5 sec to let the queue refresh
+		System.out.println("waiting for workers to terminate...");	
 		while ( 0 != outboundQueueToWorkers.queryNumberOfMessagesInQueue() ){
 			Thread.sleep(5 * 1000); // sleep 5 sec
 		}
-		
+		System.out.println("all got tremination signals, waiting 30 seconds and strating to terminate machine");
 		Thread.sleep(30 * 1000); // sleep for 30 sec
 		
+
 		for ( Instance i : workers ) {
 			ec2.terminateMachine(i);
 		}
+		
+		System.out.println("Sending shutdown ACK to local machine");
+		outboundQueueToLocalMachines.sendTerminationACK(mLocalMachineACK);
+		
+		System.out.println("shutting down..");
+		return;
 	}
 	
 	private static boolean handleMessage(Message msg) {
@@ -174,6 +197,7 @@ public class Manager {
 		String type = value.getStringValue();
 		if (type.equals(QueueUtil.MSG_TERMINATE)) {
 			mTerminated = true;
+			mLocalMachineACK = msg.getMessageAttributes().get("from").getStringValue();
 		}
 		else if (type.equals(QueueUtil.MSG_START_JOB)) {
 			String urlListinS3 		= msg.getBody();
@@ -202,7 +226,7 @@ public class Manager {
 							newWorkersToCreate +=1;
 						}
 						System.out.println("should create: " + newWorkersToCreate + " new workers");
-						//workers.addAll(ec2.createNode(newWorkersToCreate);
+						workers.addAll(ec2.createNode(newWorkersToCreate,mWorkerStartupScript));
 					}
 				}
 			}

@@ -17,8 +17,12 @@ public class LocalMachine {
 	
 	private static PropertiesCredentials Credentials;
 	
+	private static final String MANAGER_JAR_NAME = "Manager.jar";
+	private static final String MANAGER_JAR_MAIN_CLASS = "task1.Manager";
+	private static String MANAGER_JAR_PARAMETERS;
+	
 	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
-	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
+	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
 	private final static String bucketName = "mevuzarot.task1";
 	private final static String TO_LOCAL_QUEUE_IDENTIFIER 		= "mevuzarot_task1_to_local";
 	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager";
@@ -42,6 +46,7 @@ public class LocalMachine {
 					System.out.println("input file does not exists!");
 					return;
 				}
+				MANAGER_JAR_PARAMETERS = args[1];
 			}			
 			// initialize credentials
 			try {
@@ -54,21 +59,23 @@ public class LocalMachine {
 				return;
 			}
 
-			String temp = "eaf68155-6e1b-47ac-b441-854fb2487bde";
 			// initialize queues, S3 and ec2_client
-			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, temp);
-			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, temp);
+			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, null);
+			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, null);
 			s3_client = new S3Util(Credentials, bucketName);
 			ec2 = new EC2Util(Credentials);
 			
 			// create or find manager instance
-//			LocalMachine.startUpRemoteManager();
+			if (false == LocalMachine.startUpRemoteManager(args[1])) {
+				System.out.println("Failed to get Manager instance.. quitting");
+				return;
+			}
 			
 			// upload job file to S3
 			String fileToUploadPath = args[0];
 			System.out.println("Input - " + fileToUploadPath);
 			String pathInS3 = s3_client.uploadFileToS3(fileToUploadPath);
-			
+
 			// send start job message to manager
 			outboundQueueToManager.startJobWithFile(pathInS3);
 			
@@ -83,7 +90,6 @@ public class LocalMachine {
 			createHTMLFile(thumbnailsUrls, null);
 			
 			// send termination message
-			//TODO change!
 			if(args[2].equals("terminate")) {
 				outboundQueueToManager.sendTerminationSignal();
 				// wait for manager to terminate
@@ -96,7 +102,7 @@ public class LocalMachine {
 					return;
 				}
 				
-				//shutDownRemoteManager();
+				shutDownRemoteManager();
 			}
 			
 	}
@@ -134,30 +140,30 @@ public class LocalMachine {
 		while (true) {
 			messages = inboundQueueFromManager.waitForMessages(1);
 			if (messages != null) {
+				System.out.println("");
 				QueueUtil.debugMessagesForMe(messages);
 				return messages.get(0);
-				/*
-				for (Message msg : messages) {
-					if (msg.getBody().equals("terminate")) {
-						LocalMachine.shutDownRemoteManager();
-					}
-				}*/
 			}
 			try {
-				System.out.println("No message for us... sleeping");
+				System.out.print(".");
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {}
 		}		
 	}
 	
-	private static boolean startUpRemoteManager () {
+	private static boolean startUpRemoteManager (String n) {
 		try {
 			remoteManagerInstance = ec2.getManagerInstance();
 			if (null == remoteManagerInstance) {
-				remoteManagerInstance = ec2.createNode(1).get(0);
+				String managerStartupScript = UserDataScriptsClass.getManagerStartupScript(
+						MANAGER_JAR_NAME,
+						MANAGER_JAR_MAIN_CLASS,
+						MANAGER_JAR_PARAMETERS);
+				remoteManagerInstance = ec2.createNode(1, managerStartupScript).get(0);
 				ec2.setManagerTag(remoteManagerInstance);
 			}
 		} catch (Exception e) {
+			e.printStackTrace();
 			return false;
 		}
 		
