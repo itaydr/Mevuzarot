@@ -5,8 +5,10 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
@@ -38,6 +40,8 @@ public class Worker {
 	private static PropertiesCredentials Credentials;
 	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
 
+	private static WorkerStats stats;
+	
 	public static void main(String[] args) {
 		// open credentials file
 		try {
@@ -60,14 +64,28 @@ public class Worker {
 		System.out.println("Worker id is - " + response);
 		String nodeid = response;
 		
+		stats = new WorkerStats();
+		stats.uid = nodeid;
+		
 		inboundQueueFromManager = new QueueUtil(Credentials, TO_WORKERS_QUEUE_IDENTIFIER, nodeid);
 		outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, nodeid);
 		s3_client = new S3Util(Credentials, bucketName);
 		
-		
+		double totalComutationTime = 0;
+		Date urlStart;
 		while (true) {
 			Message message = inboundQueueFromManager.getSingleBroadcastMessage(WORKER_TIMEOUT);
+			
+			if (null == message && stats.proccessedUrlsCount > 0) {
+				stats.endDate = new Date();
+				stats.averageUrlProcessTime = totalComutationTime / stats.proccessedUrlsCount;
+				uploadStats();
+				
+				continue;
+			}
+			
 			if (null == message) {
+				
 				try {
 					System.out.print(".");
 					Thread.sleep(1 * 1000);
@@ -85,10 +103,18 @@ public class Worker {
 			// check termination signal
 			String type = message.getMessageAttributes().get("type").getStringValue();
 			if ( type.equals(QueueUtil.MSG_TERMINATE) ) {
+				
+				stats.endDate = new Date();
+				stats.averageUrlProcessTime = totalComutationTime / stats.proccessedUrlsCount;
+				uploadStats();
+				
 				inboundQueueFromManager.deleteMessageFromQueue(message);
 				System.out.println("Got termination signal... quitting");
 				return;
 			}
+			
+			urlStart = new Date();
+			stats.proccessedUrlsCount++;
 			
 			// work on url
 			String urlPath = message.getBody();
@@ -96,18 +122,20 @@ public class Worker {
 			try {
                 System.out.println("working on: " + urlPath);
                 
-                originalImage = readImageFromUrl(urlPath+"eeee");
+                originalImage = readImageFromUrl(urlPath);
                 System.out.println("successfully downloaded");
                 
             }
             catch (IIOException e) {
                 System.out.println("Failed to download, removing message for file: " + urlPath);
+                addFailedUrl(urlPath, e);
                 inboundQueueFromManager.deleteMessageFromQueue(message);
                 outboundQueueToManager.sendErrorToManager(urlPath);
                 continue;
             }
             catch (Exception e) {
                 System.out.println("Failed to download, not FileNotFound!: " + e);
+                addFailedUrl(urlPath, e);
                 continue;
             }
             
@@ -129,7 +157,33 @@ public class Worker {
                 removeFile(thumbnailFilePath);
             } catch (Exception e) {
                 System.out.println("Failed to crop or upload image - Not removing message. " + e);
+                addFailedUrl(urlPath, e);
             }
+            
+            double duration = (new Date().getTime()) - urlStart.getTime();
+            totalComutationTime += duration;
+            
+            stats.successfullUrls.add(urlPath);
+		}
+	}
+	
+	private static void addFailedUrl(String url, Exception e) {
+		stats.failedUrls.add(new Failure(url, e.getMessage()));
+	}
+	
+	private static void uploadStats() {
+		try {
+			String path = "WorkerStats_" + stats.uid + ".txt";
+			PrintWriter out = new PrintWriter(path);
+			out.print(stats.toString());
+			out.close();
+			
+			s3_client.uploadFileToS3(path);
+			
+			removeFile(path);
+			
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -185,4 +239,58 @@ public class Worker {
 		
 		return image;
 	}
+}
+
+class WorkerStats {
+	public String uid;
+	public Date startDate;
+	public Date endDate;
+	public double averageUrlProcessTime;
+	public int proccessedUrlsCount;
+	public ArrayList<String> successfullUrls;
+	public ArrayList<Failure> failedUrls;
+	
+	public WorkerStats() {
+		super();
+		
+		this.successfullUrls = new ArrayList<String>();
+		this.failedUrls = new ArrayList<Failure>();
+		this.startDate = new Date();
+	}
+	
+	public String toString() {
+		
+		String str = 	"Worker {" + uid + "}\n" +
+						"Start date  = " + startDate +"\n" +
+						"End date = " + endDate + "\n" +
+						"Average proccess time in MS= " + averageUrlProcessTime + "\n" +
+						"Number of processed url = " + proccessedUrlsCount + "\n";
+		str += "Successfull urls - \n";
+		for (int i = 0 ; i < successfullUrls.size() ; i++) {
+			String url = successfullUrls.get(i);
+			str += i + ": " +  url + "\n";
+		}
+		
+		str += "\nFailed urls - \n";
+		for (int i = 0 ; i < failedUrls.size() ; i++) {
+			Failure fail = failedUrls.get(i);
+			str += i + ": " + fail.url +", Error reason = " + fail.error + "\n";
+		}
+		
+		
+		return str;
+	}
+}
+
+class Failure {
+	
+	public Failure (String url, String error) {
+		super();
+		
+		this.url = url;
+		this.error = error;
+	}
+	
+	public String url;
+	public String error;
 }
