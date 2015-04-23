@@ -31,9 +31,9 @@ public class Manager {
 	private static QueueUtil outboundQueueToWorkers;
 	private static QueueUtil outboundQueueToLocalMachines;
 	
-	private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER = "mevuzarot_task1_to_manager";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER = "mevuzarot_task1_to_workers";
+	private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local_2";
+	private final static String TO_MANAGER_QUEUE_IDENTIFIER = "mevuzarot_task1_to_manager_2";
+	private final static String TO_WORKERS_QUEUE_IDENTIFIER = "mevuzarot_task1_to_workers_2";
 	
 	private final static String REMOTE_MANAGER_IDENTIFIER = "remote_manager";
 	private final static String bucketName = "mevuzarot.task1";
@@ -226,7 +226,7 @@ public class Manager {
 							newWorkersToCreate +=1;
 						}
 						System.out.println("should create: " + newWorkersToCreate + " new workers");
-						workers.addAll(ec2.createNode(newWorkersToCreate,mWorkerStartupScript));
+						//workers.addAll(ec2.createNode(newWorkersToCreate,mWorkerStartupScript));
 					}
 				}
 			}

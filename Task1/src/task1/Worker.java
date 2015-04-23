@@ -27,8 +27,8 @@ public class Worker {
 	private static int WORKER_TIMEOUT = 60;
 	
 	//private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER   = "mevuzarot_task1_to_workers";
+	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager_2";
+	private final static String TO_WORKERS_QUEUE_IDENTIFIER   = "mevuzarot_task1_to_workers_2";
 	
 	
 	private static QueueUtil inboundQueueFromManager;

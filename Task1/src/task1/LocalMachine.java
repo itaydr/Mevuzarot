@@ -25,8 +25,8 @@ public class LocalMachine {
 	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
 	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
 	private final static String bucketName = "mevuzarot.task1";
-	private final static String TO_LOCAL_QUEUE_IDENTIFIER 		= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager";
+	private final static String TO_LOCAL_QUEUE_IDENTIFIER 		= "mevuzarot_task1_to_local_2";
+	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager_2";
 	//private final static String TO_WORKERS_QUEUE_IDENTIFIER   = "mevuzarot_task1_to_workers";
 	
 	
@@ -61,16 +61,16 @@ public class LocalMachine {
 			}
 
 			// initialize queues, S3 and ec2_client
-			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, null);
-			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, null);
+			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, "itay");
+			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, "itay");
 			s3_client = new S3Util(Credentials, bucketName);
 			ec2 = new EC2Util(Credentials);
 			
 			// create or find manager instance
-			if (false == LocalMachine.startUpRemoteManager(args[1])) {
-				System.out.println("Failed to get Manager instance.. quitting");
-				return;
-			}
+//			if (false == LocalMachine.startUpRemoteManager(args[1])) {
+//				System.out.println("Failed to get Manager instance.. quitting");
+//				return;
+//			}
 			
 			// upload job file to S3
 			String fileToUploadPath = args[0];
@@ -114,7 +114,7 @@ public class LocalMachine {
 		
 		for (String line : thumbnailsUrls) {
 			String origURL  = line.substring(0, line.indexOf(';'));
-			String thumbURL = line.substring(line.indexOf(';')+1);
+			String thumbURL  = "http://" + bucketName +".s3.amazonaws.com/" + line.substring(line.indexOf(';')+1);
 			output += "<a href=\"" + origURL + "\"><img src=\"" + thumbURL + "\" width=\"50\" height=\"50\"></a>\n";
 		}
 		
