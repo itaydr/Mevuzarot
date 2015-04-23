@@ -34,7 +34,12 @@ public class S3Util {
 	public String uploadFileToS3(String fileToUploadPath){
 		File f = new File(fileToUploadPath);
 		String pathInS3 = f.getName();
-		PutObjectRequest por = new PutObjectRequest(bucketName,pathInS3,f);
+		
+        AccessControlList acl = new AccessControlList();
+        acl.grantPermission(GroupGrantee.AllUsers, Permission.Read);
+        PutObjectRequest por = new PutObjectRequest(bucketName,pathInS3,f).withAccessControlList(acl);
+        
+        
 		// Upload the file
 		S3.putObject(por);
 		System.out.println("File " + fileToUploadPath + " uploaded To: " + pathInS3);

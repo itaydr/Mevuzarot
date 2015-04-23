@@ -113,8 +113,8 @@ public class LocalMachine {
 		
 		for (String line : thumbnailsUrls) {
 			String origURL  = line.substring(0, line.indexOf(';'));
-			String thumbURL = line.substring(line.indexOf(';')+1);
-			output += "<a href=\"" + origURL + "\"><img src=\"" + thumbURL + "\" width=\"50\" height=\"50\"></a>\n";
+            String thumbURL  = "http://" + bucketName +".s3.amazonaws.com/" + line.substring(line.indexOf(';')+1);
+            output += "<a href=\"" + origURL + "\"><img src=\"" + thumbURL + "\" width=\"50\" height=\"50\"></a>\n";
 		}
 		
 		output += "</BODY>\n</HTML>";
