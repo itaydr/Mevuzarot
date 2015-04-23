@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+
 import com.amazonaws.auth.PropertiesCredentials;
 import com.amazonaws.services.sqs.model.Message;
 import com.amazonaws.services.ec2.model.Instance;
@@ -22,7 +23,7 @@ public class LocalMachine {
 	private static String MANAGER_JAR_PARAMETERS;
 	
 	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
-	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
+	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
 	private final static String bucketName = "mevuzarot.task1";
 	private final static String TO_LOCAL_QUEUE_IDENTIFIER 		= "mevuzarot_task1_to_local";
 	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager";

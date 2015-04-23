@@ -18,8 +18,8 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 public class Manager {
 
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
-	
+	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
+
 	private static final String WORKER_JAR_NAME = "Worker.jar";
 	private static final String WORKER_JAR_MAIN_CLASS = "task1.Worker";
 	private static final String WORKER_JAR_PARAMETERS = "";

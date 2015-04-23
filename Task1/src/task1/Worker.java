@@ -7,6 +7,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
+
 import javax.imageio.ImageIO;
 
 import org.imgscalr.Scalr;
@@ -34,8 +35,8 @@ public class Worker {
 	private static QueueUtil outboundQueueToManager;
 	
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
-	
+	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
+
 	public static void main(String[] args) {
 		// open credentials file
 		try {
