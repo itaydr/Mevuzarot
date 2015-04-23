@@ -5,11 +5,8 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Map.Entry;
-
 import javax.imageio.ImageIO;
 
 import org.imgscalr.Scalr;
@@ -18,7 +15,6 @@ import org.imgscalr.Scalr.Mode;
 
 import com.amazonaws.auth.PropertiesCredentials;
 import com.amazonaws.services.sqs.model.Message;
-import com.amazonaws.services.sqs.model.MessageAttributeValue;
 
 
 public class Worker {
@@ -65,14 +61,14 @@ public class Worker {
 			Message message = inboundQueueFromManager.getSingleBroadcastMessage(WORKER_TIMEOUT);
 			if (null == message) {
 				try {
-					System.out.println("No new data... sleeping");
+					System.out.print(".");
 					Thread.sleep(1 * 1000);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
 				continue;
 			}
-			// TODO: To remove
+			System.out.println("");
 			ArrayList<Message> temp = new ArrayList<Message>();
 			temp.add(message);
 			QueueUtil.debugMessagesForMe(temp);
@@ -81,6 +77,7 @@ public class Worker {
 			// check termination signal
 			String type = message.getMessageAttributes().get("type").getStringValue();
 			if ( type.equals(QueueUtil.MSG_TERMINATE) ) {
+				inboundQueueFromManager.deleteMessageFromQueue(message);
 				System.out.println("Got termination signal... quitting");
 				return;
 			}
