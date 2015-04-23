@@ -47,10 +47,16 @@ public class Worker {
 			System.out.println("Failed to open credentials file.");
 			return;
 		}
-		//TODO nodeid
-		//nodeID = "http://169.254.169.254/latest/meta-data/instance-id";
-		String nodeid = "test-worker";
-		//currently random...
+		
+        String response = null;
+        try {
+            response = new GetRequest("http://169.254.169.254/latest/meta-data/instance-id").execute();
+        } catch (Exception e) {
+            System.out.println(e.toString());
+        }
+        
+        System.out.println("Worker id is - " + response);
+        String nodeid = response;
 		
 		inboundQueueFromManager = new QueueUtil(Credentials, TO_WORKERS_QUEUE_IDENTIFIER, nodeid);
 		outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, nodeid);
