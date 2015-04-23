@@ -9,6 +9,8 @@ import java.net.URL;
 import java.util.ArrayList;
 import javax.imageio.ImageIO;
 
+import javax.imageio.IIOException;
+
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Mode;
@@ -88,35 +90,46 @@ public class Worker {
 				return;
 			}
 			
-			// work on url
-			String urlPath = message.getBody();
-			try {
-				System.out.println("working on: " + urlPath);
-				
-				BufferedImage originalImage = readImageFromUrl(urlPath);
-				System.out.println("successfully downloaded");
-			
-				BufferedImage thumbnailImage = resizeImage(originalImage, 50, 50);
-				System.out.println("successfully resized");
-						
-				String thumbnailFileBasename = urlPath.substring(urlPath.lastIndexOf('/')+1);
-				String thumbnailFilePath = "/tmp/" + thumbnailFileBasename;
-				String outputFormat = urlPath.substring(urlPath.lastIndexOf('.')+1);
-						
-				saveThumbnailToFile(thumbnailFilePath, thumbnailImage, outputFormat);
-				System.out.println("successfully saved to file");
-			
-				s3_client.uploadFileToS3(thumbnailFilePath);
-				outboundQueueToManager.finishWorkNotify(urlPath , thumbnailFileBasename);
-			
-				inboundQueueFromManager.deleteMessageFromQueue(message);
-				removeFile(thumbnailFilePath);
-			}
-			catch (Exception e) {
-				System.out.println("Failed to download: " + urlPath);
-				inboundQueueFromManager.deleteMessageFromQueue(message);
-				outboundQueueToManager.sendErrorToManager(urlPath);
-			}
+            // work on url
+            String urlPath = message.getBody();
+            BufferedImage originalImage = null;
+            try {
+                System.out.println("working on: " + urlPath);
+                
+                originalImage = readImageFromUrl(urlPath+"eeee");
+                System.out.println("successfully downloaded");
+                
+            }
+            catch (IIOException e) {
+                System.out.println("Failed to download, removing message for file: " + urlPath);
+                inboundQueueFromManager.deleteMessageFromQueue(message);
+                outboundQueueToManager.sendErrorToManager(urlPath);
+                continue;
+            }
+            catch (Exception e) {
+                System.out.println("Failed to download, not FileNotFound!: " + e);
+                continue;
+            }
+            
+            try {
+                BufferedImage thumbnailImage = resizeImage(originalImage, 50, 50);
+                System.out.println("successfully resized");
+                
+                String thumbnailFileBasename = urlPath.substring(urlPath.lastIndexOf('/')+1);
+                String thumbnailFilePath = "/tmp/" + thumbnailFileBasename;
+                String outputFormat = urlPath.substring(urlPath.lastIndexOf('.')+1);
+                
+                saveThumbnailToFile(thumbnailFilePath, thumbnailImage, outputFormat);
+                System.out.println("successfully saved to file");
+                
+                s3_client.uploadFileToS3(thumbnailFilePath);
+                outboundQueueToManager.finishWorkNotify(urlPath , thumbnailFileBasename);
+                
+                inboundQueueFromManager.deleteMessageFromQueue(message);
+                removeFile(thumbnailFilePath);
+            } catch (Exception e) {
+                System.out.println("Failed to crop or upload image - Not removing message. " + e);
+            }
 		}
 	}
 
