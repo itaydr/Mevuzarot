@@ -36,7 +36,7 @@ public class QueueUtil {
 	private static String REMOTE_MANAGER_IDENTIFIER = "remote_manager";
 	private static String BROADCAST = "*";
 	
-	private String currentUID;
+	public String currentUID;
 	
 	private AmazonSQS sqs;
 	private String queueUrl;
