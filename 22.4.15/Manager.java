@@ -18,11 +18,6 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 public class Manager {
 
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
-	
-	private static final String WORKER_JAR_NAME = "Worker.jar";
-	private static final String WORKER_JAR_MAIN_CLASS = "task1.Worker";
-	private static final String WORKER_JAR_PARAMETERS = "";
 	
 	private static String mWorkerStartupScript;
 	
@@ -30,13 +25,7 @@ public class Manager {
 	private static QueueUtil inboundQueueFromLocalAndWorkers;
 	private static QueueUtil outboundQueueToWorkers;
 	private static QueueUtil outboundQueueToLocalMachines;
-	
-	private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER = "mevuzarot_task1_to_manager";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER = "mevuzarot_task1_to_workers";
-	
-	private final static String REMOTE_MANAGER_IDENTIFIER = "remote_manager";
-	private final static String bucketName = "mevuzarot.task1";
+
 	private static boolean mTerminated = false;
 
 	
@@ -52,16 +41,20 @@ public class Manager {
 	
 	private static class Job {
 		private String localMachineID;
-		private HashMap<String, Boolean> urlListController;
+		private HashMap<String, Integer> urlListController;
 		private ArrayList<String> outputSummary;
 		private int unfinishedURLs;
 		
+		private final static int URL_PENDING = 0;
+		private final static int URL_SUCCESS = 1;
+		private final static int URL_FIALED = 2;
+		
 		Job(String localMachineID, List<String> urlList) {
 			this.localMachineID = localMachineID;
-			this.urlListController = new HashMap<String, Boolean>();
+			this.urlListController = new HashMap<String, Integer>();
 			this.outputSummary = new ArrayList<String>();
 			for (String url : urlList) {
-				this.urlListController.put(url, false);
+				this.urlListController.put(url, new Integer(URL_PENDING));
 			}
 			this.unfinishedURLs = urlList.size();
 			Manager.currentRunningURLs += urlList.size();
@@ -80,18 +73,23 @@ public class Manager {
 		}
 		
 		public boolean isURLinJob(String url){
-			return urlListController.containsKey(url);
+			if (urlListController.containsKey(url)) {
+				if ( ((Integer)urlListController.get(url).intValue()) == URL_PENDING) {
+					return true;
+				}
+			}
+			return false;
 		}
 		
 		public void markDoneURL(String origURL, String fullLine){
-			urlListController.put(origURL, true);
+			urlListController.put(origURL, new Integer(URL_SUCCESS));
 			outputSummary.add(fullLine);
 			unfinishedURLs--;
 			Manager.currentRunningURLs--;
 		}
 		
 		public void markErrorURL(String url){
-			urlListController.put(url, null);
+			urlListController.put(url, new Integer(URL_FIALED));
 			unfinishedURLs--;
 			Manager.currentRunningURLs--;
 		}
@@ -120,13 +118,13 @@ public class Manager {
 		currentRunningURLs = 0;
 		jobs = new ArrayList<Job>();
 		workers = new ArrayList<Instance>();
-		mWorkerStartupScript = UserDataScriptsClass.getManagerStartupScript(WORKER_JAR_NAME, 
-				WORKER_JAR_MAIN_CLASS, 
-				WORKER_JAR_PARAMETERS);
+		mWorkerStartupScript = UserDataScriptsClass.getManagerStartupScript(Config.TASK1_JAR_NAME, 
+				Config.WORKER_JAR_MAIN_CLASS, 
+				Config.WORKER_JAR_PARAMETERS);
 
 		// initialize credentials
 		try {
-			Credentials = new PropertiesCredentials(new FileInputStream(propertiesFilePath));
+			Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 		} catch (FileNotFoundException e) {
 			System.out.println("Failed to open credentials file.");
 			return;
@@ -136,10 +134,10 @@ public class Manager {
 		}
 
 		// initialize queues, S3 and ec2_client
-		inboundQueueFromLocalAndWorkers = new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, REMOTE_MANAGER_IDENTIFIER);
-		outboundQueueToWorkers =  new QueueUtil(Credentials, TO_WORKERS_QUEUE_IDENTIFIER, REMOTE_MANAGER_IDENTIFIER);
-		outboundQueueToLocalMachines =  new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, REMOTE_MANAGER_IDENTIFIER);
-		s3_client = new S3Util(Credentials, bucketName);
+		inboundQueueFromLocalAndWorkers = new QueueUtil(Credentials, Config.TO_MANAGER_QUEUE_IDENTIFIER, Config.REMOTE_MANAGER_IDENTIFIER);
+		outboundQueueToWorkers =  new QueueUtil(Credentials, Config.TO_WORKERS_QUEUE_IDENTIFIER, Config.REMOTE_MANAGER_IDENTIFIER);
+		outboundQueueToLocalMachines =  new QueueUtil(Credentials, Config.TO_LOCAL_QUEUE_IDENTIFIER, Config.REMOTE_MANAGER_IDENTIFIER);
+		s3_client = new S3Util(Credentials, Config.bucketName);
 		ec2 = new EC2Util(Credentials);
 		
 		while (false == mTerminated || jobs.size() != 0) {
@@ -173,7 +171,7 @@ public class Manager {
 			Thread.sleep(5 * 1000); // sleep 5 sec
 		}
 		System.out.println("all got tremination signals, waiting 30 seconds and strating to terminate machine");
-		Thread.sleep(30 * 1000); // sleep for 30 sec
+		Thread.sleep(10 * 1000); // sleep for 10 sec
 		
 
 		for ( Instance i : workers ) {
@@ -205,7 +203,7 @@ public class Manager {
 			
 			if (mTerminated) { //we are terminated (should not get here...)
 				System.out.println("Cannot start new job - terminated");
-				outboundQueueToLocalMachines.sendMessage(QueueUtil.MSG_TERMINATE, REMOTE_MANAGER_IDENTIFIER, localMachineID, QueueUtil.MSG_TERMINATE);
+				outboundQueueToLocalMachines.sendMessage(QueueUtil.MSG_TERMINATE, Config.REMOTE_MANAGER_IDENTIFIER, localMachineID, QueueUtil.MSG_TERMINATE);
 			}
 			else { // we are running
 				List<String> urls = s3_client.getFileContentFromS3(urlListinS3);

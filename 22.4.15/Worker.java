@@ -25,27 +25,18 @@ public class Worker {
 	//private static String nodeID;
 	
 	private static S3Util s3_client;
-	private static String bucketName = "mevuzarot.task1";
-	
-	private static int WORKER_TIMEOUT = 60;
-	
-	//private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager_2";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER   = "mevuzarot_task1_to_workers_2";
-	
 	
 	private static QueueUtil inboundQueueFromManager;
 	private static QueueUtil outboundQueueToManager;
 	
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
 
 	private static WorkerStats stats;
 	
 	public static void main(String[] args) {
 		// open credentials file
 		try {
-			Credentials = new PropertiesCredentials(new FileInputStream(propertiesFilePath));
+			Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 		} catch (FileNotFoundException e) {
 			System.out.println("Failed to open credentials file.");
 			return;
@@ -67,22 +58,14 @@ public class Worker {
 		stats = new WorkerStats();
 		stats.uid = nodeid;
 		
-		inboundQueueFromManager = new QueueUtil(Credentials, TO_WORKERS_QUEUE_IDENTIFIER, nodeid);
-		outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, nodeid);
-		s3_client = new S3Util(Credentials, bucketName);
+		inboundQueueFromManager = new QueueUtil(Credentials, Config.TO_WORKERS_QUEUE_IDENTIFIER, nodeid);
+		outboundQueueToManager =  new QueueUtil(Credentials, Config.TO_MANAGER_QUEUE_IDENTIFIER, nodeid);
+		s3_client = new S3Util(Credentials, Config.bucketName);
 		
 		double totalComutationTime = 0;
 		Date urlStart;
 		while (true) {
-			Message message = inboundQueueFromManager.getSingleBroadcastMessage(WORKER_TIMEOUT);
-			
-			if (null == message && stats.proccessedUrlsCount > 0) {
-				stats.endDate = new Date();
-				stats.averageUrlProcessTime = totalComutationTime / stats.proccessedUrlsCount;
-				uploadStats();
-				
-				continue;
-			}
+			Message message = inboundQueueFromManager.getSingleBroadcastMessage(Config.WORKER_TIMEOUT);
 			
 			if (null == message) {
 				
@@ -119,11 +102,15 @@ public class Worker {
 			// work on url
 			String urlPath = message.getBody();
 			BufferedImage originalImage = null;
+			BufferedImage thumbnailImage;
 			try {
                 System.out.println("working on: " + urlPath);
                 
                 originalImage = readImageFromUrl(urlPath);
-                System.out.println("successfully downloaded");
+                System.out.println("successfully downloaded web page");
+                
+                thumbnailImage = resizeImage(originalImage, 50, 50);
+                System.out.println("successfully resized");
                 
             }
             catch (IIOException e) {
@@ -133,6 +120,13 @@ public class Worker {
                 outboundQueueToManager.sendErrorToManager(urlPath);
                 continue;
             }
+			catch (NullPointerException e) {
+                System.out.println("Failed to resize - content not an image(?), removing message for file: " + urlPath);
+                addFailedUrl(urlPath, e);
+                inboundQueueFromManager.deleteMessageFromQueue(message);
+                outboundQueueToManager.sendErrorToManager(urlPath);
+                continue;
+			}
             catch (Exception e) {
                 System.out.println("Failed to download, not FileNotFound!: " + e);
                 addFailedUrl(urlPath, e);
@@ -140,8 +134,6 @@ public class Worker {
             }
             
             try {
-                BufferedImage thumbnailImage = resizeImage(originalImage, 50, 50);
-                System.out.println("successfully resized");
                 
                 String thumbnailFileBasename = urlPath.substring(urlPath.lastIndexOf('/')+1);
                 String thumbnailFilePath = "/tmp/" + thumbnailFileBasename;
@@ -158,6 +150,7 @@ public class Worker {
             } catch (Exception e) {
                 System.out.println("Failed to crop or upload image - Not removing message. " + e);
                 addFailedUrl(urlPath, e);
+                continue;
             }
             
             double duration = (new Date().getTime()) - urlStart.getTime();
