@@ -61,8 +61,8 @@ public class LocalMachine {
 			}
 
 			// initialize queues, S3 and ec2_client
-			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, "itay");
-			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, "itay");
+			inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, null);
+			outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER,inboundQueueFromManager.currentUID);
 			s3_client = new S3Util(Credentials, bucketName);
 			ec2 = new EC2Util(Credentials);
 			
