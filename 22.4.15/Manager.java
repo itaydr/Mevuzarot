@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -39,23 +38,31 @@ public class Manager {
 	private static int currentRunningURLs;
 	private static String mLocalMachineACK;
 	
+	private static PrintWriter out; 
+	
+	
 	private static class Job {
 		private String localMachineID;
-		private HashMap<String, Integer> urlListController;
+//		private HashMap<String, Integer> urlListController;
+		private ArrayList<String> allURLs;
+		private ArrayList<String> doneURLs;
+		private ArrayList<String> failedURLs;
+		
 		private ArrayList<String> outputSummary;
 		private int unfinishedURLs;
 		
-		private final static int URL_PENDING = 0;
-		private final static int URL_SUCCESS = 1;
-		private final static int URL_FIALED = 2;
-		
 		Job(String localMachineID, List<String> urlList) {
 			this.localMachineID = localMachineID;
-			this.urlListController = new HashMap<String, Integer>();
+			this.allURLs = new ArrayList<String>();
+			this.doneURLs = new ArrayList<String>();
+			this.failedURLs = new ArrayList<String>();
+//			this.urlListController = new HashMap<String, Integer>();
 			this.outputSummary = new ArrayList<String>();
+			
 			for (String url : urlList) {
-				this.urlListController.put(url, new Integer(URL_PENDING));
+				this.allURLs.add(url);
 			}
+			
 			this.unfinishedURLs = urlList.size();
 			Manager.currentRunningURLs += urlList.size();
 		}
@@ -65,7 +72,9 @@ public class Manager {
 			if ( ! (obj instanceof  Job)) return false;
 			Job other = (Job) obj;
 			if ( ! ( localMachineID.equals(other.localMachineID) )) return false;
-			if ( ! ( urlListController.equals(other.urlListController ))) return false;
+			if ( ! ( allURLs.equals(other.allURLs ))) return false;
+			if ( ! ( doneURLs.equals(other.doneURLs ))) return false;
+			if ( ! ( failedURLs.equals(other.failedURLs ))) return false;
 			if ( ! ( outputSummary.equals(other.outputSummary))) return false;
 			if ( ! ( unfinishedURLs == other.unfinishedURLs)) return false;
 			
@@ -73,24 +82,27 @@ public class Manager {
 		}
 		
 		public boolean isURLinJob(String url){
-			if (urlListController.containsKey(url)) {
-				if ( ((Integer)urlListController.get(url).intValue()) == URL_PENDING) {
-					return true;
-				}
-			}
-			return false;
+			return allURLs.indexOf(url) != -1;
 		}
 		
 		public void markDoneURL(String origURL, String fullLine){
-			urlListController.put(origURL, new Integer(URL_SUCCESS));
+			int index = allURLs.indexOf(origURL);
+			doneURLs.add(origURL);
+			allURLs.remove(index);
+
 			outputSummary.add(fullLine);
 			unfinishedURLs--;
+			debugLog("Done success - " + origURL + " - " + unfinishedURLs);
 			Manager.currentRunningURLs--;
 		}
 		
-		public void markErrorURL(String url){
-			urlListController.put(url, new Integer(URL_FIALED));
+		public void markErrorURL(String origURL){
+			int index = allURLs.indexOf(origURL);
+			failedURLs.add(origURL);
+			allURLs.remove(index);
+
 			unfinishedURLs--;
+			debugLog("Error - " + origURL + " - " + unfinishedURLs);
 			Manager.currentRunningURLs--;
 		}
 		
@@ -99,11 +111,17 @@ public class Manager {
 		}
 		
 		public int getUnfinishedURLs() {
+			System.out.println("getUnfinishedURLs::unfinishedURLs: " + unfinishedURLs);
+			printStatus();
 			return unfinishedURLs;
 		}
 		
 		public String getLocalMachineID() {
 			return localMachineID;
+		}
+		
+		public void printStatus() {
+			System.out.println(allURLs.toString());
 		}
 	}
 	
@@ -114,6 +132,14 @@ public class Manager {
 		}
 		
 		// init variables
+		File file = new File (Config.ManagerLogFilePath);
+		try {
+			out = new PrintWriter(file);
+		} catch (FileNotFoundException e1) {
+			e1.printStackTrace();
+			return;
+		}
+		
 		n = Integer.parseInt(args[0]);
 		currentRunningURLs = 0;
 		jobs = new ArrayList<Job>();
@@ -126,10 +152,10 @@ public class Manager {
 		try {
 			Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 		} catch (FileNotFoundException e) {
-			System.out.println("Failed to open credentials file.");
+			System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 			return;
 		} catch (IOException e) {
-			System.out.println("Failed to open credentials file.");
+			System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 			return;
 		}
 
@@ -182,6 +208,7 @@ public class Manager {
 		outboundQueueToLocalMachines.sendTerminationACK(mLocalMachineACK);
 		
 		System.out.println("shutting down..");
+		out.close();
 		return;
 	}
 	
@@ -230,9 +257,11 @@ public class Manager {
 			}
 		}
 		else if (type.equals(QueueUtil.MSG_FINISHED_WORK)) {
+			boolean sanityCheck = false;
 			for (Job j : jobs) {
 				String origURL  = msg.getBody().substring(0, msg.getBody().indexOf(';'));
 				if ( j.isURLinJob(origURL) ){
+					sanityCheck = true;
 					j.markDoneURL(origURL , msg.getBody());
 					if ( 0 == j.getUnfinishedURLs() ) { //job is done!
 						createSummaryAndReplyLocal(j);
@@ -241,10 +270,17 @@ public class Manager {
 					break;
 				}
 			}
+			
+			if (sanityCheck == false) {
+				System.out.println("!!!!ALERT!!!! not taking care of message" + msg.getBody());
+			}
+			
 		} else if (type.equals(QueueUtil.MSG_ERROR_WORK)) {
+			boolean sanityCheck = false;
 			for (Job j : jobs) {
 				String origURL  = msg.getBody();
 				if ( j.isURLinJob(origURL) ){
+					sanityCheck = true;
 					j.markErrorURL(origURL);
 					if ( 0 == j.getUnfinishedURLs() ) { //job is done!
 						createSummaryAndReplyLocal(j);
@@ -252,6 +288,9 @@ public class Manager {
 					}
 					break;
 				}
+			}
+			if (sanityCheck == false) {
+				System.out.println("!!!!ALERT!!!! not taking care of message" + msg.getBody());
 			}
 		}
 		return true;
@@ -300,6 +339,12 @@ public class Manager {
 		} catch (Exception x) {
 			System.out.println("Failed to delete File: "+ filePath);
 		}
+	}
+	
+
+	private static void debugLog(String line) {
+		out.println(line);
+		out.flush();
 	}
 
 }
