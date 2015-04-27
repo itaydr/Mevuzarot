@@ -29,7 +29,7 @@ public class EC2Util {
 	}
 	
 	public List<Instance> createNode(int numberOfMachines, String userDataScript) {
-		RunInstancesRequest request = new RunInstancesRequest(instancesName, numberOfMachines, numberOfMachines);
+		RunInstancesRequest request = new RunInstancesRequest(instancesName, 1, numberOfMachines);
 		request.setInstanceType(instancesType);
 		request.setKeyName(keyPair);
 		request.withSecurityGroups(secuirtyGroup);

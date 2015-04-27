@@ -40,10 +40,10 @@ public class LocalMachine {
 			try {
 				Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 			} catch (FileNotFoundException e) {
-				System.out.println("Failed to open credentials file.");
+				System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 				return;
 			} catch (IOException e) {
-				System.out.println("Failed to open credentials file.");
+				System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 				return;
 			}
 
@@ -138,7 +138,7 @@ public class LocalMachine {
 			}
 			try {
 				System.out.print(".");
-				Thread.sleep(1000);
+				Thread.sleep(1000 * Config.randomSleep(2,5));
 			} catch (InterruptedException e) {}
 		}		
 	}

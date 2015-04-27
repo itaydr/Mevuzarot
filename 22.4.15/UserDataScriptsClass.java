@@ -8,8 +8,8 @@ import org.apache.commons.codec.binary.Base64;
 
 public class UserDataScriptsClass {
 	
-	private static final String mAccesKey = "AKIAIQKEG7I4RAWPYYBQ";
-	private static final String mSecretCccesKey = "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";
+	private static final String mAccesKey = "XXXXX";
+	private static final String mSecretCccesKey = "XXXX";
 	private static final String mPrivateBuckerName = "mevuzarot.task1";
 	
 	
@@ -19,9 +19,6 @@ public class UserDataScriptsClass {
         // start of script
         lines.add("#!/bin/sh");
         lines.add("BIN_DIR=/tmp");
-        lines.add("AWS_ACCESS_KEY_ID=" + mAccesKey);
-        lines.add("AWS_SECRET_ACCESS_KEY=" + mSecretCccesKey);
-        lines.add("AWS_DEFAULT_REGION=us-east-1");
         lines.add("mkdir -p $BIN_DIR/dependencies");
         lines.add("cd $BIN_DIR/dependencies");
         lines.add("wget http://mevuzarot.task1.s3.amazonaws.com/jars/joined.zip");
@@ -30,6 +27,9 @@ public class UserDataScriptsClass {
         lines.add("cd $BIN_DIR/running");
         lines.add("mkdir -p $BIN_DIR/running/task1_lib");
         lines.add("cp ../dependencies/*.jar task1_lib/");
+        lines.add("AWS_ACCESS_KEY_ID=" + mAccesKey);
+        lines.add("AWS_SECRET_ACCESS_KEY=" + mSecretCccesKey);
+        lines.add("AWS_DEFAULT_REGION=us-east-1");
         lines.add("export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_DEFAULT_REGION");
         lines.add("aws s3 cp s3://" + mPrivateBuckerName + "/task1.jar task1.jar");
         lines.add("echo accessKey=$AWS_ACCESS_KEY_ID > credentials.file");

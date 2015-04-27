@@ -112,7 +112,7 @@ public class Manager {
 		
 		public int getUnfinishedURLs() {
 			System.out.println("getUnfinishedURLs::unfinishedURLs: " + unfinishedURLs);
-			printStatus();
+//			printStatus();
 			return unfinishedURLs;
 		}
 		
@@ -120,9 +120,9 @@ public class Manager {
 			return localMachineID;
 		}
 		
-		public void printStatus() {
-			System.out.println(allURLs.toString());
-		}
+//		public void printStatus() {
+//			System.out.println(allURLs.toString());
+//		}
 	}
 	
 	public static void main(String[] args) throws InterruptedException {

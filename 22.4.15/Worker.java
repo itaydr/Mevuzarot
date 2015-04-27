@@ -6,8 +6,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.UUID;
@@ -111,16 +111,12 @@ public class Worker {
 				// work on url
 				String urlPath = message.getBody();
 				String thumbnailFileBasename  = null;
-				BufferedImage originalImage = null;
+//				BufferedImage originalImage = null;
 				BufferedImage thumbnailImage;
 				try {
 	                System.out.println("working on url: " + urlPath);
 	                
-	                originalImage = readImageFromUrl(urlPath);
-	                System.out.println("successfully downloaded image");
-	                
-	                thumbnailImage = resizeImage(originalImage, 50, 50);
-	                System.out.println("successfully image has been resized");
+	                thumbnailImage = downloadAndThumb(urlPath, 50, 50);
 	                
 	                thumbnailFileBasename = nodeid + "_" + imgCounter.toString();
 	            	imgCounter++;
@@ -191,6 +187,30 @@ public class Worker {
 		out.close();
 	}
 	
+	private static BufferedImage downloadAndThumb(String urlPath, int h, int w) throws Exception {
+
+		BufferedImage originalImage = null;
+		BufferedImage thumbnailImage = null;
+		
+		
+        try {
+			originalImage = readImageFromUrlMethod1(urlPath);
+			System.out.println("downloaded method1");
+			thumbnailImage = resizeImage(originalImage, 50, 50);
+			System.out.println("successfully resized");
+		} catch (Exception e) {
+			System.out.println("got Exception in method 1... trying method 2");
+			e.printStackTrace();
+			
+			originalImage = readImageFromUrlMethod2(urlPath);
+			System.out.println("downloaded method2");
+	        thumbnailImage = resizeImage(originalImage, 50, 50);
+	        System.out.println("successfully image has been resized");
+		}
+        
+		return thumbnailImage;
+	}
+
 	private static void addFailedUrl(String url, Exception e) {
 		stats.failedUrls.add(new Failure(url, e.getMessage()));
 	}
@@ -261,24 +281,54 @@ public class Worker {
 		return thumbImg;
 	}
 	
-	private static BufferedImage readImageFromUrl(String urlPath) throws IOException {
+	private static BufferedImage readImageFromUrlMethod1(String urlPath) throws Exception {
 		BufferedImage image = null;
 		
 	    URL url = new URL(urlPath);
-	    try {	
-	    	// try method 1
-	    	image = ImageIO.read(url);
-	    } catch (IIOException e) {
-	    	// try method 2
-	    	System.out.println("e " + e);
-	    	URLConnection uc = url.openConnection();
-	        uc.addRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)");
-
-	        uc.connect();
-	    	
-	    	image = ImageIO.read(uc.getInputStream());
-		}
+    	// try method 1
+    	image = ImageIO.read(url);
 	    
+		return image;
+	}
+	
+	private static BufferedImage readImageFromUrlMethod2(String urlPath) throws Exception {
+		BufferedImage image = null;
+		
+	    URL url = new URL(urlPath);
+    	// try method 2
+	    HttpURLConnection.setFollowRedirects(true); 
+    	HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    	conn.setInstanceFollowRedirects(true);
+    	conn.setReadTimeout(5000);
+    	conn.addRequestProperty("Accept-Language", "en-US,en;q=0.8");
+    	conn.addRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)");
+    	
+    	// normally, 3xx is redirect
+    	int status = conn.getResponseCode();
+    	System.out.println("got: " + status);
+    	System.out.println("headers: " + conn.getHeaderFields().toString());
+    	while (status != HttpURLConnection.HTTP_OK 
+    		&& (status == HttpURLConnection.HTTP_MOVED_TEMP
+    			|| status == HttpURLConnection.HTTP_MOVED_PERM
+    				|| status == HttpURLConnection.HTTP_SEE_OTHER)){
+    		
+	    	// get redirect url from "location" header field
+			String newUrl = conn.getHeaderField("Location");
+	 
+			// get the cookie if need, for login
+			String cookies = conn.getHeaderField("Set-Cookie");
+	 
+			// open the new connnection again
+			conn = (HttpURLConnection) new URL(newUrl).openConnection();
+			conn.setRequestProperty("Cookie", cookies);
+			conn.addRequestProperty("Accept-Language", "en-US,en;q=0.8");
+			conn.addRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)");
+	 
+			System.out.println("Redirect to URL : " + newUrl);
+			status = conn.getResponseCode();
+    	}
+    	
+    	image = ImageIO.read(conn.getInputStream());
 		return image;
 	}
 	
