@@ -16,20 +16,8 @@ import com.amazonaws.services.ec2.model.Instance;
 public class LocalMachine {
 	
 	private static PropertiesCredentials Credentials;
-	
-	private static final String MANAGER_JAR_NAME = "Manager.jar";
-	private static final String MANAGER_JAR_MAIN_CLASS = "task1.Manager";
 	private static String MANAGER_JAR_PARAMETERS;
 	
-	// @itay: this file is not committed because github is public. Make sure you copy it before testing.
-	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
-	private final static String bucketName = "mevuzarot.task1";
-	private final static String TO_LOCAL_QUEUE_IDENTIFIER 		= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager";
-	//private final static String TO_WORKERS_QUEUE_IDENTIFIER   = "mevuzarot_task1_to_workers";
-	
-	
-	//private static AmazonEC2 ec2;
 	private static EC2Util ec2;
 	private static Instance remoteManagerInstance;
 	private static S3Util s3_client;
@@ -50,20 +38,20 @@ public class LocalMachine {
 			}			
 			// initialize credentials
 			try {
-				Credentials = new PropertiesCredentials(new FileInputStream(propertiesFilePath));
+				Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 			} catch (FileNotFoundException e) {
-				System.out.println("Failed to open credentials file.");
+				System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 				return;
 			} catch (IOException e) {
-				System.out.println("Failed to open credentials file.");
+				System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 				return;
 			}
 
 			// initialize queues, S3 and ec2_client
-            inboundQueueFromManager = new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, null);
-            outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER,inboundQueueFromManager.currentUID);
+            inboundQueueFromManager = new QueueUtil(Credentials, Config.TO_LOCAL_QUEUE_IDENTIFIER, null);
+            outboundQueueToManager =  new QueueUtil(Credentials, Config.TO_MANAGER_QUEUE_IDENTIFIER,inboundQueueFromManager.currentUID);
 
-			s3_client = new S3Util(Credentials, bucketName);
+			s3_client = new S3Util(Credentials, Config.bucketName);
 			ec2 = new EC2Util(Credentials);
 			
 			// create or find manager instance
@@ -88,10 +76,10 @@ public class LocalMachine {
 			}
 			String summaryPath = receivedMessage.getBody();
 			ArrayList<String> thumbnailsUrls = s3_client.getFileContentFromS3(summaryPath);
-			createHTMLFile(thumbnailsUrls, null);
+			createHTMLFile(thumbnailsUrls, inboundQueueFromManager.currentUID + ".html");
 			
 			// send termination message
-			if(args[2].equals("terminate")) {
+			if(args.length == 3 && args[2].equals("terminate")) {
 				outboundQueueToManager.sendTerminationSignal();
 				// wait for manager to terminate
 				receivedMessage = LocalMachine.loopForSingleMessage();
@@ -102,6 +90,8 @@ public class LocalMachine {
 					QueueUtil.printMessages(tempList);
 					return;
 				}
+				
+				Thread.sleep(5 * 1000);
 				
 				shutDownRemoteManager();
 			}
@@ -114,7 +104,7 @@ public class LocalMachine {
 		
 		for (String line : thumbnailsUrls) {
 			String origURL  = line.substring(0, line.indexOf(';'));
-            String thumbURL  = "http://" + bucketName +".s3.amazonaws.com/" + line.substring(line.indexOf(';')+1);
+            String thumbURL  = "http://" + Config.bucketName +".s3.amazonaws.com/" + line.substring(line.indexOf(';')+1);
             output += "<a href=\"" + origURL + "\"><img src=\"" + thumbURL + "\" width=\"50\" height=\"50\"></a>\n";
 		}
 		
@@ -128,6 +118,7 @@ public class LocalMachine {
 				PrintWriter out = new PrintWriter(file);
 				out.println(output);
 				out.close();
+				System.out.println("Write html file to: "+ outputFilePath);
 			} catch (FileNotFoundException e) {
 				System.out.println("Failed to write to file: "+ outputFilePath);
 				System.out.println(output);
@@ -147,7 +138,7 @@ public class LocalMachine {
 			}
 			try {
 				System.out.print(".");
-				Thread.sleep(1000);
+				Thread.sleep(1000 * Config.randomSleep(2,5));
 			} catch (InterruptedException e) {}
 		}		
 	}
@@ -157,8 +148,8 @@ public class LocalMachine {
 			remoteManagerInstance = ec2.getManagerInstance();
 			if (null == remoteManagerInstance) {
 				String managerStartupScript = UserDataScriptsClass.getManagerStartupScript(
-						MANAGER_JAR_NAME,
-						MANAGER_JAR_MAIN_CLASS,
+						Config.TASK1_JAR_NAME,
+						Config.MANAGER_JAR_MAIN_CLASS,
 						MANAGER_JAR_PARAMETERS);
 				remoteManagerInstance = ec2.createNode(1, managerStartupScript).get(0);
 				ec2.setManagerTag(remoteManagerInstance);

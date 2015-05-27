@@ -6,13 +6,14 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.UUID;
 
 import javax.imageio.IIOException;
 import javax.imageio.ImageIO;
-
 import org.imgscalr.Scalr;
 import org.imgscalr.Scalr.Method;
 import org.imgscalr.Scalr.Mode;
@@ -22,43 +23,41 @@ import com.amazonaws.services.sqs.model.Message;
 
 
 public class Worker {
-	//private static String nodeID;
-	
 	private static S3Util s3_client;
-	private static String bucketName = "mevuzarot.task1";
-	
-	private static int WORKER_TIMEOUT = 60;
-	
-	//private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_manager_2";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER   = "mevuzarot_task1_to_workers_2";
-	
 	
 	private static QueueUtil inboundQueueFromManager;
 	private static QueueUtil outboundQueueToManager;
 	
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "src/task1/_itay_creds.properties";
 
 	private static WorkerStats stats;
 	
-	public static void main(String[] args) {
+	private static Integer imgCounter;
+	private static PrintWriter out; 
+	
+	public static void main(String[] args) throws IOException {
+		File file = new File (Config.workerLogFilePath);
+		out = new PrintWriter(file);
+		
 		// open credentials file
 		try {
-			Credentials = new PropertiesCredentials(new FileInputStream(propertiesFilePath));
+			Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 		} catch (FileNotFoundException e) {
-			System.out.println("Failed to open credentials file.");
+			System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 			return;
 		} catch (IOException e) {
-			System.out.println("Failed to open credentials file.");
+			System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 			return;
 		}
 		
+		imgCounter = 0;
+
 		String response = null;
 		try {
 			response = new GetRequest("http://169.254.169.254/latest/meta-data/instance-id").execute();
 		} catch (Exception e) {
 			System.out.println(e.toString());
+			response = "WORKER-" + UUID.randomUUID().toString();
 		}
 		
 		System.out.println("Worker id is - " + response);
@@ -67,106 +66,151 @@ public class Worker {
 		stats = new WorkerStats();
 		stats.uid = nodeid;
 		
-		inboundQueueFromManager = new QueueUtil(Credentials, TO_WORKERS_QUEUE_IDENTIFIER, nodeid);
-		outboundQueueToManager =  new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, nodeid);
-		s3_client = new S3Util(Credentials, bucketName);
-		
+		inboundQueueFromManager = new QueueUtil(Credentials, Config.TO_WORKERS_QUEUE_IDENTIFIER, nodeid);
+		outboundQueueToManager =  new QueueUtil(Credentials, Config.TO_MANAGER_QUEUE_IDENTIFIER, nodeid);
+		s3_client = new S3Util(Credentials, Config.bucketName);
+	
 		double totalComutationTime = 0;
 		Date urlStart;
-		while (true) {
-			Message message = inboundQueueFromManager.getSingleBroadcastMessage(WORKER_TIMEOUT);
-			
-			if (null == message && stats.proccessedUrlsCount > 0) {
-				stats.endDate = new Date();
-				stats.averageUrlProcessTime = totalComutationTime / stats.proccessedUrlsCount;
-				uploadStats();
-				
-				continue;
-			}
-			
-			if (null == message) {
-				
-				try {
-					System.out.print(".");
-					Thread.sleep(1 * 1000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
+		String thumbnailFilePath = null;
+		try {
+			while (true) {
+				System.out.println("trying to get BroadcastMessage.");
+				Message message = inboundQueueFromManager.getSingleBroadcastMessage(Config.WORKER_TIMEOUT);
+				if (null == message) {
+					try {
+						System.out.print(".");
+						Thread.sleep(1000 * Config.randomSleep(1,3));
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					continue;
 				}
-				continue;
-			}
-			System.out.println("");
-			ArrayList<Message> temp = new ArrayList<Message>();
-			temp.add(message);
-			QueueUtil.debugMessagesForMe(temp);
-			
-
-			// check termination signal
-			String type = message.getMessageAttributes().get("type").getStringValue();
-			if ( type.equals(QueueUtil.MSG_TERMINATE) ) {
+				System.out.println("found not null message");
+				System.out.println("");
+				ArrayList<Message> temp = new ArrayList<Message>();
+				temp.add(message);
+				QueueUtil.debugMessagesForMe(temp);
 				
-				stats.endDate = new Date();
-				stats.averageUrlProcessTime = totalComutationTime / stats.proccessedUrlsCount;
-				uploadStats();
+				// check termination signal
+				String type = message.getMessageAttributes().get("type").getStringValue();
+				if ( type.equals(QueueUtil.MSG_TERMINATE) ) {
+					System.out.println("This is Terminate message");
+					stats.endDate = new Date();
+					stats.averageUrlProcessTime = totalComutationTime / stats.proccessedUrlsCount;
+					uploadStats();
+					
+					inboundQueueFromManager.deleteMessageFromQueue(message);
+					System.out.println("Got termination signal... quitting");
+					return;
+				}
 				
-				inboundQueueFromManager.deleteMessageFromQueue(message);
-				System.out.println("Got termination signal... quitting");
-				return;
+				urlStart = new Date();
+				stats.proccessedUrlsCount++;
+				
+				// work on url
+				String urlPath = message.getBody();
+				String thumbnailFileBasename  = null;
+//				BufferedImage originalImage = null;
+				BufferedImage thumbnailImage;
+				try {
+	                System.out.println("working on url: " + urlPath);
+	                
+	                thumbnailImage = downloadAndThumb(urlPath, 50, 50);
+	                
+	                thumbnailFileBasename = nodeid + "_" + imgCounter.toString();
+	            	imgCounter++;
+	            	
+	            	String outputFormat = urlPath.substring(urlPath.lastIndexOf('.')+1);
+	            	
+	                thumbnailFilePath = "/tmp/" + thumbnailFileBasename;
+	                if (false == saveThumbnailToFile(thumbnailFilePath, thumbnailImage, outputFormat)) {
+	                	throw new Exception("Failed to save file with format type: " + outputFormat);
+	                }
+	                
+	                System.out.println("successfully saved to file: " + thumbnailFilePath);
+	            }
+	            catch (IIOException e) {
+	                System.out.println("Failed to download, removing message for file: " + urlPath);
+	                debugLog("error4 - " + urlPath);
+	                addFailedUrl(urlPath, e);
+	                inboundQueueFromManager.deleteMessageFromQueue(message);
+	                outboundQueueToManager.sendErrorToManager(urlPath);
+	                continue;
+	            }
+				catch (NullPointerException e) {
+	                System.out.println("Failed to resize - content not an image(?), removing message for file: " + urlPath);
+	                debugLog("error3 - " + urlPath);
+	                addFailedUrl(urlPath, e);
+	                inboundQueueFromManager.deleteMessageFromQueue(message);
+	                outboundQueueToManager.sendErrorToManager(urlPath);
+	                continue;
+				}
+	            catch (Exception e) {
+	                System.out.println("Failed to download, general exception, not FileNotFound!: " + e);
+	                debugLog("error2 - " + urlPath);
+	                addFailedUrl(urlPath, e);
+	                inboundQueueFromManager.deleteMessageFromQueue(message);
+	                outboundQueueToManager.sendErrorToManager(urlPath);
+	                continue;
+	            }
+	            
+	            try {
+	                s3_client.uploadFileToS3(thumbnailFilePath);
+	                System.out.println("successfully uploaded to S3");
+	                
+	                outboundQueueToManager.finishWorkNotify(urlPath , thumbnailFileBasename);
+	                System.out.println("sending finish work");
+	                debugLog("ok - " + urlPath);
+	                
+	                inboundQueueFromManager.deleteMessageFromQueue(message);
+	                System.out.println("deleting from queue");
+	                
+	                removeFile(thumbnailFilePath);
+	                System.out.println("local file deleted");
+	            } catch (Exception e) {
+	                System.out.println("general failiure - Not removing message. saveToLocalFile / uploadToS3 / Queue..." + e);
+	                debugLog("error1 - " + urlPath);
+	                addFailedUrl(urlPath, e);
+	                continue;
+	            }
+	            
+	            double duration = (new Date().getTime()) - urlStart.getTime();
+	            totalComutationTime += duration;
+	            
+	            stats.successfullUrls.add(urlPath);
+	            System.out.println("going to another round..." + (new Date().getTime()));
 			}
-			
-			urlStart = new Date();
-			stats.proccessedUrlsCount++;
-			
-			// work on url
-			String urlPath = message.getBody();
-			BufferedImage originalImage = null;
-			try {
-                System.out.println("working on: " + urlPath);
-                
-                originalImage = readImageFromUrl(urlPath);
-                System.out.println("successfully downloaded");
-                
-            }
-            catch (IIOException e) {
-                System.out.println("Failed to download, removing message for file: " + urlPath);
-                addFailedUrl(urlPath, e);
-                inboundQueueFromManager.deleteMessageFromQueue(message);
-                outboundQueueToManager.sendErrorToManager(urlPath);
-                continue;
-            }
-            catch (Exception e) {
-                System.out.println("Failed to download, not FileNotFound!: " + e);
-                addFailedUrl(urlPath, e);
-                continue;
-            }
-            
-            try {
-                BufferedImage thumbnailImage = resizeImage(originalImage, 50, 50);
-                System.out.println("successfully resized");
-                
-                String thumbnailFileBasename = urlPath.substring(urlPath.lastIndexOf('/')+1);
-                String thumbnailFilePath = "/tmp/" + thumbnailFileBasename;
-                String outputFormat = urlPath.substring(urlPath.lastIndexOf('.')+1);
-                
-                saveThumbnailToFile(thumbnailFilePath, thumbnailImage, outputFormat);
-                System.out.println("successfully saved to file");
-                
-                s3_client.uploadFileToS3(thumbnailFilePath);
-                outboundQueueToManager.finishWorkNotify(urlPath , thumbnailFileBasename);
-                
-                inboundQueueFromManager.deleteMessageFromQueue(message);
-                removeFile(thumbnailFilePath);
-            } catch (Exception e) {
-                System.out.println("Failed to crop or upload image - Not removing message. " + e);
-                addFailedUrl(urlPath, e);
-            }
-            
-            double duration = (new Date().getTime()) - urlStart.getTime();
-            totalComutationTime += duration;
-            
-            stats.successfullUrls.add(urlPath);
+		} catch (Exception e) {
+			System.out.println("There is an unhandeled exception! " + e);
 		}
+		out.close();
 	}
 	
+	private static BufferedImage downloadAndThumb(String urlPath, int h, int w) throws Exception {
+
+		BufferedImage originalImage = null;
+		BufferedImage thumbnailImage = null;
+		
+		
+        try {
+			originalImage = readImageFromUrlMethod1(urlPath);
+			System.out.println("downloaded method1");
+			thumbnailImage = resizeImage(originalImage, 50, 50);
+			System.out.println("successfully resized");
+		} catch (Exception e) {
+			System.out.println("got Exception in method 1... trying method 2");
+			e.printStackTrace();
+			
+			originalImage = readImageFromUrlMethod2(urlPath);
+			System.out.println("downloaded method2");
+	        thumbnailImage = resizeImage(originalImage, 50, 50);
+	        System.out.println("successfully image has been resized");
+		}
+        
+		return thumbnailImage;
+	}
+
 	private static void addFailedUrl(String url, Exception e) {
 		stats.failedUrls.add(new Failure(url, e.getMessage()));
 	}
@@ -201,18 +245,24 @@ public class Worker {
 		}
 	}
 
-	private static void saveThumbnailToFile(String thumbnailFilePath, 
+	private static boolean saveThumbnailToFile(String thumbnailFilePath, 
 			BufferedImage thumbnailImage,
 			String outputFormat) {
 		  
 		File f2 = new File(thumbnailFilePath);
-		
+		System.out.println("The file fotmat is: " + outputFormat);
 		try {
-			ImageIO.write(thumbnailImage, outputFormat, f2);
+			if (outputFormat.toLowerCase().equals("jpe")) {
+				System.out.println(" [+] handling jpe file.. as jpg");
+				return ImageIO.write(thumbnailImage, "jpg", f2);
+			} else {
+				return ImageIO.write(thumbnailImage, outputFormat, f2);
+			}
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.out.println("Failed to write output path");
 		}
+		return false;
 	}
 
 	private static BufferedImage resizeImage(BufferedImage originalImage, int width, int height) {
@@ -231,13 +281,60 @@ public class Worker {
 		return thumbImg;
 	}
 	
-	private static BufferedImage readImageFromUrl(String urlPath) throws IOException {
+	private static BufferedImage readImageFromUrlMethod1(String urlPath) throws Exception {
 		BufferedImage image = null;
 		
 	    URL url = new URL(urlPath);
-	    image = ImageIO.read(url);
-		
+    	// try method 1
+    	image = ImageIO.read(url);
+	    
 		return image;
+	}
+	
+	private static BufferedImage readImageFromUrlMethod2(String urlPath) throws Exception {
+		BufferedImage image = null;
+		
+	    URL url = new URL(urlPath);
+    	// try method 2
+	    HttpURLConnection.setFollowRedirects(true); 
+    	HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+    	conn.setInstanceFollowRedirects(true);
+    	conn.setReadTimeout(5000);
+    	conn.addRequestProperty("Accept-Language", "en-US,en;q=0.8");
+    	conn.addRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)");
+    	
+    	// normally, 3xx is redirect
+    	int status = conn.getResponseCode();
+    	System.out.println("got: " + status);
+    	System.out.println("headers: " + conn.getHeaderFields().toString());
+    	while (status != HttpURLConnection.HTTP_OK 
+    		&& (status == HttpURLConnection.HTTP_MOVED_TEMP
+    			|| status == HttpURLConnection.HTTP_MOVED_PERM
+    				|| status == HttpURLConnection.HTTP_SEE_OTHER)){
+    		
+	    	// get redirect url from "location" header field
+			String newUrl = conn.getHeaderField("Location");
+	 
+			// get the cookie if need, for login
+			String cookies = conn.getHeaderField("Set-Cookie");
+	 
+			// open the new connnection again
+			conn = (HttpURLConnection) new URL(newUrl).openConnection();
+			conn.setRequestProperty("Cookie", cookies);
+			conn.addRequestProperty("Accept-Language", "en-US,en;q=0.8");
+			conn.addRequestProperty("User-Agent", "Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0)");
+	 
+			System.out.println("Redirect to URL : " + newUrl);
+			status = conn.getResponseCode();
+    	}
+    	
+    	image = ImageIO.read(conn.getInputStream());
+		return image;
+	}
+	
+	private static void debugLog(String line) {
+		out.println(line);
+		out.flush();
 	}
 }
 

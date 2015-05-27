@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 
@@ -18,11 +17,6 @@ import com.amazonaws.services.sqs.model.MessageAttributeValue;
 public class Manager {
 
 	private static PropertiesCredentials Credentials;
-	private final static String propertiesFilePath = "/home/asaf/Desktop/Mevuzarot/creds/asaf";
-	
-	private static final String WORKER_JAR_NAME = "Worker.jar";
-	private static final String WORKER_JAR_MAIN_CLASS = "task1.Worker";
-	private static final String WORKER_JAR_PARAMETERS = "";
 	
 	private static String mWorkerStartupScript;
 	
@@ -30,13 +24,7 @@ public class Manager {
 	private static QueueUtil inboundQueueFromLocalAndWorkers;
 	private static QueueUtil outboundQueueToWorkers;
 	private static QueueUtil outboundQueueToLocalMachines;
-	
-	private final static String TO_LOCAL_QUEUE_IDENTIFIER 	= "mevuzarot_task1_to_local";
-	private final static String TO_MANAGER_QUEUE_IDENTIFIER = "mevuzarot_task1_to_manager";
-	private final static String TO_WORKERS_QUEUE_IDENTIFIER = "mevuzarot_task1_to_workers";
-	
-	private final static String REMOTE_MANAGER_IDENTIFIER = "remote_manager";
-	private final static String bucketName = "mevuzarot.task1";
+
 	private static boolean mTerminated = false;
 
 	
@@ -50,19 +38,31 @@ public class Manager {
 	private static int currentRunningURLs;
 	private static String mLocalMachineACK;
 	
+	private static PrintWriter out; 
+	
+	
 	private static class Job {
 		private String localMachineID;
-		private HashMap<String, Boolean> urlListController;
+//		private HashMap<String, Integer> urlListController;
+		private ArrayList<String> allURLs;
+		private ArrayList<String> doneURLs;
+		private ArrayList<String> failedURLs;
+		
 		private ArrayList<String> outputSummary;
 		private int unfinishedURLs;
 		
 		Job(String localMachineID, List<String> urlList) {
 			this.localMachineID = localMachineID;
-			this.urlListController = new HashMap<String, Boolean>();
+			this.allURLs = new ArrayList<String>();
+			this.doneURLs = new ArrayList<String>();
+			this.failedURLs = new ArrayList<String>();
+//			this.urlListController = new HashMap<String, Integer>();
 			this.outputSummary = new ArrayList<String>();
+			
 			for (String url : urlList) {
-				this.urlListController.put(url, false);
+				this.allURLs.add(url);
 			}
+			
 			this.unfinishedURLs = urlList.size();
 			Manager.currentRunningURLs += urlList.size();
 		}
@@ -72,7 +72,9 @@ public class Manager {
 			if ( ! (obj instanceof  Job)) return false;
 			Job other = (Job) obj;
 			if ( ! ( localMachineID.equals(other.localMachineID) )) return false;
-			if ( ! ( urlListController.equals(other.urlListController ))) return false;
+			if ( ! ( allURLs.equals(other.allURLs ))) return false;
+			if ( ! ( doneURLs.equals(other.doneURLs ))) return false;
+			if ( ! ( failedURLs.equals(other.failedURLs ))) return false;
 			if ( ! ( outputSummary.equals(other.outputSummary))) return false;
 			if ( ! ( unfinishedURLs == other.unfinishedURLs)) return false;
 			
@@ -80,19 +82,27 @@ public class Manager {
 		}
 		
 		public boolean isURLinJob(String url){
-			return urlListController.containsKey(url);
+			return allURLs.indexOf(url) != -1;
 		}
 		
 		public void markDoneURL(String origURL, String fullLine){
-			urlListController.put(origURL, true);
+			int index = allURLs.indexOf(origURL);
+			doneURLs.add(origURL);
+			allURLs.remove(index);
+
 			outputSummary.add(fullLine);
 			unfinishedURLs--;
+			debugLog("Done success - " + origURL + " - " + unfinishedURLs);
 			Manager.currentRunningURLs--;
 		}
 		
-		public void markErrorURL(String url){
-			urlListController.put(url, null);
+		public void markErrorURL(String origURL){
+			int index = allURLs.indexOf(origURL);
+			failedURLs.add(origURL);
+			allURLs.remove(index);
+
 			unfinishedURLs--;
+			debugLog("Error - " + origURL + " - " + unfinishedURLs);
 			Manager.currentRunningURLs--;
 		}
 		
@@ -101,12 +111,18 @@ public class Manager {
 		}
 		
 		public int getUnfinishedURLs() {
+			System.out.println("getUnfinishedURLs::unfinishedURLs: " + unfinishedURLs);
+//			printStatus();
 			return unfinishedURLs;
 		}
 		
 		public String getLocalMachineID() {
 			return localMachineID;
 		}
+		
+//		public void printStatus() {
+//			System.out.println(allURLs.toString());
+//		}
 	}
 	
 	public static void main(String[] args) throws InterruptedException {
@@ -116,30 +132,38 @@ public class Manager {
 		}
 		
 		// init variables
+		File file = new File (Config.ManagerLogFilePath);
+		try {
+			out = new PrintWriter(file);
+		} catch (FileNotFoundException e1) {
+			e1.printStackTrace();
+			return;
+		}
+		
 		n = Integer.parseInt(args[0]);
 		currentRunningURLs = 0;
 		jobs = new ArrayList<Job>();
 		workers = new ArrayList<Instance>();
-		mWorkerStartupScript = UserDataScriptsClass.getManagerStartupScript(WORKER_JAR_NAME, 
-				WORKER_JAR_MAIN_CLASS, 
-				WORKER_JAR_PARAMETERS);
+		mWorkerStartupScript = UserDataScriptsClass.getManagerStartupScript(Config.TASK1_JAR_NAME, 
+				Config.WORKER_JAR_MAIN_CLASS, 
+				Config.WORKER_JAR_PARAMETERS);
 
 		// initialize credentials
 		try {
-			Credentials = new PropertiesCredentials(new FileInputStream(propertiesFilePath));
+			Credentials = new PropertiesCredentials(new FileInputStream(Config.propertiesFilePath));
 		} catch (FileNotFoundException e) {
-			System.out.println("Failed to open credentials file.");
+			System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 			return;
 		} catch (IOException e) {
-			System.out.println("Failed to open credentials file.");
+			System.out.println("Failed to open credentials file: " + Config.propertiesFilePath);
 			return;
 		}
 
 		// initialize queues, S3 and ec2_client
-		inboundQueueFromLocalAndWorkers = new QueueUtil(Credentials, TO_MANAGER_QUEUE_IDENTIFIER, REMOTE_MANAGER_IDENTIFIER);
-		outboundQueueToWorkers =  new QueueUtil(Credentials, TO_WORKERS_QUEUE_IDENTIFIER, REMOTE_MANAGER_IDENTIFIER);
-		outboundQueueToLocalMachines =  new QueueUtil(Credentials, TO_LOCAL_QUEUE_IDENTIFIER, REMOTE_MANAGER_IDENTIFIER);
-		s3_client = new S3Util(Credentials, bucketName);
+		inboundQueueFromLocalAndWorkers = new QueueUtil(Credentials, Config.TO_MANAGER_QUEUE_IDENTIFIER, Config.REMOTE_MANAGER_IDENTIFIER);
+		outboundQueueToWorkers =  new QueueUtil(Credentials, Config.TO_WORKERS_QUEUE_IDENTIFIER, Config.REMOTE_MANAGER_IDENTIFIER);
+		outboundQueueToLocalMachines =  new QueueUtil(Credentials, Config.TO_LOCAL_QUEUE_IDENTIFIER, Config.REMOTE_MANAGER_IDENTIFIER);
+		s3_client = new S3Util(Credentials, Config.bucketName);
 		ec2 = new EC2Util(Credentials);
 		
 		while (false == mTerminated || jobs.size() != 0) {
@@ -173,7 +197,7 @@ public class Manager {
 			Thread.sleep(5 * 1000); // sleep 5 sec
 		}
 		System.out.println("all got tremination signals, waiting 30 seconds and strating to terminate machine");
-		Thread.sleep(30 * 1000); // sleep for 30 sec
+		Thread.sleep(10 * 1000); // sleep for 10 sec
 		
 
 		for ( Instance i : workers ) {
@@ -184,6 +208,7 @@ public class Manager {
 		outboundQueueToLocalMachines.sendTerminationACK(mLocalMachineACK);
 		
 		System.out.println("shutting down..");
+		out.close();
 		return;
 	}
 	
@@ -205,7 +230,7 @@ public class Manager {
 			
 			if (mTerminated) { //we are terminated (should not get here...)
 				System.out.println("Cannot start new job - terminated");
-				outboundQueueToLocalMachines.sendMessage(QueueUtil.MSG_TERMINATE, REMOTE_MANAGER_IDENTIFIER, localMachineID, QueueUtil.MSG_TERMINATE);
+				outboundQueueToLocalMachines.sendMessage(QueueUtil.MSG_TERMINATE, Config.REMOTE_MANAGER_IDENTIFIER, localMachineID, QueueUtil.MSG_TERMINATE);
 			}
 			else { // we are running
 				List<String> urls = s3_client.getFileContentFromS3(urlListinS3);
@@ -232,9 +257,11 @@ public class Manager {
 			}
 		}
 		else if (type.equals(QueueUtil.MSG_FINISHED_WORK)) {
+			boolean sanityCheck = false;
 			for (Job j : jobs) {
 				String origURL  = msg.getBody().substring(0, msg.getBody().indexOf(';'));
 				if ( j.isURLinJob(origURL) ){
+					sanityCheck = true;
 					j.markDoneURL(origURL , msg.getBody());
 					if ( 0 == j.getUnfinishedURLs() ) { //job is done!
 						createSummaryAndReplyLocal(j);
@@ -243,10 +270,17 @@ public class Manager {
 					break;
 				}
 			}
+			
+			if (sanityCheck == false) {
+				System.out.println("!!!!ALERT!!!! not taking care of message" + msg.getBody());
+			}
+			
 		} else if (type.equals(QueueUtil.MSG_ERROR_WORK)) {
+			boolean sanityCheck = false;
 			for (Job j : jobs) {
 				String origURL  = msg.getBody();
 				if ( j.isURLinJob(origURL) ){
+					sanityCheck = true;
 					j.markErrorURL(origURL);
 					if ( 0 == j.getUnfinishedURLs() ) { //job is done!
 						createSummaryAndReplyLocal(j);
@@ -254,6 +288,9 @@ public class Manager {
 					}
 					break;
 				}
+			}
+			if (sanityCheck == false) {
+				System.out.println("!!!!ALERT!!!! not taking care of message" + msg.getBody());
 			}
 		}
 		return true;
@@ -302,6 +339,12 @@ public class Manager {
 		} catch (Exception x) {
 			System.out.println("Failed to delete File: "+ filePath);
 		}
+	}
+	
+
+	private static void debugLog(String line) {
+		out.println(line);
+		out.flush();
 	}
 
 }
