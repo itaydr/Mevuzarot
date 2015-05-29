@@ -32,6 +32,9 @@ import edu.umd.cloud9.io.pair.PairOfStrings;
 
 public class Main {
 
+	private static double minPmi = Double.MAX_VALUE;
+	private static double relMinPmi = Double.MAX_VALUE;
+	
 	private static final Logger LOG = Logger.getAnonymousLogger();
 
 	private static final String TMP_FILE_PATH = "/user/hduser/ass_2_intermediate";
@@ -275,12 +278,14 @@ public class Main {
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 
-			pair.set(AppearanceCountMapper
-					.removeCenturyPrefix(left), AppearanceCountMapper
-					.removeCenturyPrefix(right));
+			if (npmi > minPmi) {
+				pair.set(AppearanceCountMapper
+						.removeCenturyPrefix(left), AppearanceCountMapper
+						.removeCenturyPrefix(right));
 
-			PMI.set(npmi);
-			context.write(pair, PMI);
+				PMI.set(npmi);
+				context.write(pair, PMI);
+			}
 		}
 	}
 
@@ -305,6 +310,12 @@ public class Main {
 
 		Configuration conf = new Configuration();
 		conf.set("intermediatePath", intermediatePath);
+		minPmi = Double.parseDouble(args[2]);
+		relMinPmi = Double.parseDouble(args[3]);
+		
+		// TODO: fetch from conf
+		conf.set("minPmi", args[2]);
+		conf.set("relMinPmi", args[3]);
 
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
