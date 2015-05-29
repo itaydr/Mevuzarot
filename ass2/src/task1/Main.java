@@ -5,7 +5,10 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.logging.Logger;
 
@@ -301,12 +304,12 @@ public class Main {
 	 * 
 	 */
 	private static class PmiFilterMapper extends
-			Mapper<LongWritable, Text, Text, Text> {
+			Mapper<LongWritable, Text, Text, PairOfStrings> {
 
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
-		private final static IntWritable NUM = new IntWritable(1);
+		private final static PairOfStrings STR = new PairOfStrings();
 
 		
 		@Override
@@ -318,40 +321,40 @@ public class Main {
 			VAL.set(arr[1] + " " + arr[2]+ " " + arr[3]); // Rest of the info
 			
 			//LOG.info("Last map value --- " + KEY + ":: " + VAL);
-			
-			context.write(KEY, VAL);
+			STR.set(arr[1] + " " + arr[2], arr[3]);
+			context.write(KEY, STR);//VAL);
 		}
 	}
 	
 	// First stage Reducer: Totals counts for each Token and Token Pair
 	private static class PmiFilterReducer extends
-			Reducer<Text, Text, PairOfStrings, Text> {
+			Reducer<Text, PairOfStrings, PairOfStrings, Text> {
 		// Reuse objects
 		// Objects for reuse
 		private final static PairOfStrings PAIR = new PairOfStrings();
 		private final static Text VAL = new Text();
-		private final static IntWritable NUM = new IntWritable(1);
+
 		@Override
-		public void reduce(Text key, Iterable<Text> values,
+		public void reduce(Text key, Iterable<PairOfStrings> values,
 				Context context) throws IOException, InterruptedException {
 			double totalPmiInDecade = 0;
 			String[] arr = null;
-			for (Text value : values) {
-				arr = value.toString().trim().split("\\s+");
-				double npmi = Double.parseDouble(arr[2]);
+			PairOfStrings pair;
+			Iterator<PairOfStrings> it = values.iterator();
+			List<PairOfStrings> cache = new ArrayList<PairOfStrings>();
+			while (it.hasNext()) {
+				pair = it.next();
+				double npmi = Double.parseDouble(pair.getRightElement());
 				totalPmiInDecade += npmi;
+				cache.add(pair);
 			}
-			
-			//LOG.info("Last reduce key --- " + key);
-			
-			for (Text value : values) {
-				LOG.info("Last reduce value --- " + key + ":: " + value);
-				arr = value.toString().trim().split("\\s+");
-				double npmi = Double.parseDouble(arr[2]);
-				
-				if (npmi > 0.5 || (npmi / totalPmiInDecade) > relMinPmi) {
+
+			for (PairOfStrings p : cache) {
+				arr = p.getLeftElement().trim().split("\\s+");
+				double npmi = Double.parseDouble(p.getRightElement());
+				if (npmi > minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
 					PAIR.set(arr[0], arr[1]);
-					VAL.set(arr[2]);
+					VAL.set(p.getRightElement());
 					context.write(PAIR, VAL);
 				}	
 			}
@@ -443,8 +446,8 @@ public class Main {
 		job3.setMapperClass(PmiFilterMapper.class);
 		job3.setReducerClass(PmiFilterReducer.class);
 
-		job3.setOutputKeyClass(Text.class);
-		job3.setOutputValueClass(Text.class);
+		job3.setMapOutputKeyClass(Text.class);
+		job3.setMapOutputValueClass(PairOfStrings.class);	
 		
 		FileInputFormat.addInputPath(job3, new Path(intermediatePath2));
 		FileOutputFormat.setOutputPath(job3, new Path(args[1]));
