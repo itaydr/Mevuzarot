@@ -6,11 +6,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.TreeSet;
 import java.util.logging.Logger;
 
 import org.apache.hadoop.conf.Configuration;
@@ -37,8 +33,10 @@ public class Main {
 	
 	private static final Logger LOG = Logger.getAnonymousLogger();
 
-	private static final String TMP_FILE_PATH = "/user/hduser/ass_2_intermediate";
+	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1"; // Used for the c() fumction file - first job
+	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; // used for the npmi calculation file - second job
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
+	private static final String DECADE_SUM_PREFIX = "decade_";
 
 	private static BigInteger ENG_BIGRAM_COUNT = new BigInteger("6626604215");
 	private static BigInteger HEB_BIGRAM_COUNT = new BigInteger("252069581");
@@ -86,7 +84,7 @@ public class Main {
 		
 		private static String removeCenturyPrefix(String word) throws IOException {
 			if (word != null && word.length() >= 4) {
-				return word;//.substring(4);
+				return word.substring(4);
 			}
 	
 			throw new IOException(
@@ -138,7 +136,7 @@ public class Main {
 			context.write(key, SUM);
 		}
 	}
-
+	
 	/************************
 	 * 
 	 * Pairs PMI calculation
@@ -188,13 +186,16 @@ public class Main {
 
 	// Second Stage reducer: Finalizes PMI Calculation given
 	private static class PairsPMIReducer extends
-			Reducer<PairOfStrings, IntWritable, PairOfStrings, DoubleWritable> {
+			Reducer<PairOfStrings, IntWritable, Text, Text> {
 
 		private static Map<String, Integer> termTotals = new HashMap<String, Integer>();
 
 		private static DoubleWritable PMI = new DoubleWritable();
 		// TODO: set the number of items in the heb/eng corpus.
 		private static double totalDocs = 156215.0;
+		// Objects for reuse
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
 
 		@Override
 		public void setup(Context context) throws IOException {
@@ -204,7 +205,7 @@ public class Main {
 			FileSystem fs = FileSystem.get(conf);
 
 			// Path inFile = new Path(conf.get("intermediatePath"));
-			Path inFile = new Path(TMP_FILE_PATH + HDFS_FIRST_SPLIT_SUFFIX);
+			Path inFile = new Path(TMP_FILE_PATH_1 + HDFS_FIRST_SPLIT_SUFFIX);
 
 			if (!fs.exists(inFile)) {
 				throw new IOException("File Not Found: " + inFile.toString());
@@ -278,17 +279,84 @@ public class Main {
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 
-			if (npmi > minPmi) {
+			double sumInDecade = 1;
+			
+			//if (npmi > minPmi || (npmi / sumInDecade) >= relMinPmi) {
 				pair.set(AppearanceCountMapper
 						.removeCenturyPrefix(left), AppearanceCountMapper
 						.removeCenturyPrefix(right));
 
 				PMI.set(npmi);
-				context.write(pair, PMI);
+				KEY.set(left.substring(0, 3));
+				VAL.set(pair.getLeftElement() + " " + pair.getRightElement() + " " + npmi);
+				context.write(KEY, VAL);
+			//}
+		}
+	}
+	
+	/**************************
+	 * 
+	 * Appearance counting
+	 * 
+	 * 
+	 */
+	private static class PmiFilterMapper extends
+			Mapper<LongWritable, Text, Text, Text> {
+
+		// Objects for reuse
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
+		private final static IntWritable NUM = new IntWritable(1);
+
+		
+		@Override
+		public void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+
+			String[] arr = value.toString().trim().split("\\s+");
+			KEY.set(arr[0]); // The decade
+			VAL.set(arr[1] + " " + arr[2]+ " " + arr[3]); // Rest of the info
+			
+			//LOG.info("Last map value --- " + KEY + ":: " + VAL);
+			
+			context.write(KEY, VAL);
+		}
+	}
+	
+	// First stage Reducer: Totals counts for each Token and Token Pair
+	private static class PmiFilterReducer extends
+			Reducer<Text, Text, PairOfStrings, Text> {
+		// Reuse objects
+		// Objects for reuse
+		private final static PairOfStrings PAIR = new PairOfStrings();
+		private final static Text VAL = new Text();
+		private final static IntWritable NUM = new IntWritable(1);
+		@Override
+		public void reduce(Text key, Iterable<Text> values,
+				Context context) throws IOException, InterruptedException {
+			double totalPmiInDecade = 0;
+			String[] arr = null;
+			for (Text value : values) {
+				arr = value.toString().trim().split("\\s+");
+				double npmi = Double.parseDouble(arr[2]);
+				totalPmiInDecade += npmi;
+			}
+			
+			//LOG.info("Last reduce key --- " + key);
+			
+			for (Text value : values) {
+				LOG.info("Last reduce value --- " + key + ":: " + value);
+				arr = value.toString().trim().split("\\s+");
+				double npmi = Double.parseDouble(arr[2]);
+				
+				if (npmi > 0.5 || (npmi / totalPmiInDecade) > relMinPmi) {
+					PAIR.set(arr[0], arr[1]);
+					VAL.set(arr[2]);
+					context.write(PAIR, VAL);
+				}	
 			}
 		}
 	}
-
 	public static void main(String[] args) throws Exception {
 		
 		if (args.length < 2) {
@@ -302,14 +370,16 @@ public class Main {
 		// The fits job will have an intermediate output path from which the
 		// second job's reducer will read
 		String outputPath = args[1];
-		String intermediatePath = TMP_FILE_PATH;
+		String intermediatePath1 = TMP_FILE_PATH_1;
+		String intermediatePath2 = TMP_FILE_PATH_2;
 
 		LOG.info("Tool: Appearances Part");
 		LOG.info(" - input path: " + inputPath);
-		LOG.info(" - output path: " + intermediatePath);
+		LOG.info(" - output path: " + intermediatePath1);
 
 		Configuration conf = new Configuration();
-		conf.set("intermediatePath", intermediatePath);
+		conf.set("intermediatePath1", intermediatePath1);
+		conf.set("intermediatePath2", intermediatePath2);
 		minPmi = Double.parseDouble(args[2]);
 		relMinPmi = Double.parseDouble(args[3]);
 		
@@ -322,7 +392,7 @@ public class Main {
 		job1.setJarByClass(Main.class);
 
 		FileInputFormat.setInputPaths(job1, new Path(inputPath));
-		FileOutputFormat.setOutputPath(job1, new Path(intermediatePath));
+		FileOutputFormat.setOutputPath(job1, new Path(intermediatePath1));
 
 		job1.setOutputKeyClass(Text.class);
 		job1.setOutputValueClass(IntWritable.class);
@@ -333,7 +403,7 @@ public class Main {
 		job1.setReducerClass(AppearanceCountReducer.class);
 
 		// Delete the output directory if it exists already.
-		Path intermediateDir = new Path(intermediatePath);
+		Path intermediateDir = new Path(intermediatePath1);
 		FileSystem.get(conf).delete(intermediateDir, true);
 
 		long startTime = System.currentTimeMillis();
@@ -355,18 +425,37 @@ public class Main {
 		job2.setOutputValueClass(IntWritable.class);
 		
 		FileInputFormat.addInputPath(job2, new Path(args[0]));
-		FileOutputFormat.setOutputPath(job2, new Path(args[1]));
+		FileOutputFormat.setOutputPath(job2, new Path(intermediatePath2));
 		
-		Path outputDir = new Path(outputPath);
+		Path outputDir = new Path(intermediatePath2);
 		FileSystem.get(conf).delete(outputDir, true);
+		
+		startTime = System.currentTimeMillis();
+		boolean status = job2.waitForCompletion(true);
+		LOG.info("PairsPmiCounter Job Finished in "
+				+ (System.currentTimeMillis() - startTime) / 1000.0
+				+ " seconds");
+		
+		// Third job
+		Job job3 = Job.getInstance(conf);
+		job3.setJobName("Pmi Filter");
+		job3.setJarByClass(Main.class);
+		job3.setMapperClass(PmiFilterMapper.class);
+		job3.setReducerClass(PmiFilterReducer.class);
+
+		job3.setOutputKeyClass(Text.class);
+		job3.setOutputValueClass(Text.class);
+		
+		FileInputFormat.addInputPath(job3, new Path(intermediatePath2));
+		FileOutputFormat.setOutputPath(job3, new Path(args[1]));
 		
 		// Delete the output directory if it exists already.
 		Path outDir = new Path(outputPath);
 		FileSystem.get(conf).delete(outDir, true);
 
 		startTime = System.currentTimeMillis();
-		boolean status = job2.waitForCompletion(true);
-		LOG.info("PairsPmiCounter Job Finished in "
+		status = job3.waitForCompletion(true);
+		LOG.info("PmiFilter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 
