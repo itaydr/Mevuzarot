@@ -71,41 +71,48 @@ public class Main {
 
 			return null;
 		}
-
-		public static String removeLeftPrefix(String word) {
-			LOG.info("removeLeftPrefix - word = " + word +", LEFT_PREFIX=" + LEFT_PREFIX + ", length = " + LEFT_PREFIX.length());
-			if (word != null) {
-				return word.substring(LEFT_PREFIX.length());
+		
+		private static String appendCentury(String word, String year) throws IOException {
+			if (word != null && year != null && year.length() > 3) {
+				return  year.substring(0, 3) + "_" + word;
 			}
 			
-			LOG.info("Received null word in removeLeftPrefix");
-			
-			return "";
+			throw new IOException(
+					"Bad words for append century ::" + word + ", " + year);
 		}
-
-		public static String removeRightPrefix(String word) {
-			if (word != null) {
-				return word.substring(RIGHT_PREFIX.length());
+		
+		private static String removeCenturyPrefix(String word) throws IOException {
+			if (word != null && word.length() >= 4) {
+				return word;//.substring(4);
 			}
-			
-			LOG.info("Received null word in removeRightPrefix");
-
-			return "";
+	
+			throw new IOException(
+					"Bad words for remove century ::" + word);
+		}
+		
+		private static boolean validateInput2gram(String[] lineArray) {
+			 if(lineArray.length >= 4 && lineArray[2].length() >= 4) {
+				 return true;
+			 }
+			 else {
+				 //	LOG.info("Bad input for mapper --> (" + value + ")::(" + arr.length + ")");
+				 return false;
+			 }
 		}
 
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			String[] arr = value.toString().trim().split("\t");
-			if (arr.length < 4) {
-				LOG.info("Bad input for mapper --> (" + value + ")::(" + arr.length + ")");
-				return;
+			String[] arr = value.toString().trim().split("\\s+");
+			if (!validateInput2gram(arr)) {
+			return;
 			}
+			
 			COUNT.set(Integer.parseInt(arr[3]));
-			KEY.set(appendLeftPrefix(arr[0]));
+			KEY.set(appendLeftPrefix(appendCentury(arr[0], arr[2])));
 			context.write(KEY, COUNT);
-			KEY.set(appendRightPrefix(arr[1]));
+			KEY.set(appendLeftPrefix(appendCentury(arr[1], arr[2])));
 			context.write(KEY, COUNT);
 		}
 	}
@@ -147,15 +154,13 @@ public class Main {
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			String[] arr = value.toString().trim().split("\t");
-			if (arr.length < 4) {
-				LOG.info("Bad input for mapper --> (" + value + ")::(" + arr.length + ")");
+			String[] arr = value.toString().trim().split("\\s+");
+			if (!AppearanceCountMapper.validateInput2gram(arr)) {
 				return;
 			}
 			
-			LOG.info("Line - " + value);
-			
-			PAIR.set(arr[0], arr[1]);
+			PAIR.set(AppearanceCountMapper.appendCentury(arr[0], arr[2]), 
+					AppearanceCountMapper.appendCentury(arr[1], arr[2]));
 			COUNT.set(Integer.parseInt(arr[3]));
 			context.write(PAIR, COUNT);
 		}
@@ -262,13 +267,17 @@ public class Main {
 			}
 			
 			double probPair = pairSum / totalDocs;
-			double probLeft = termTotals.get(leftWithPre) / totalDocs;
-			double probRight = termTotals.get(rightWithPre) / totalDocs;
+			double leftOcc = termTotals.containsKey(leftWithPre) ? termTotals.get(leftWithPre) : 1;
+			double probLeft = leftOcc / totalDocs;
+			double rightOcc =  termTotals.containsKey(rightWithPre) ? termTotals.get(rightWithPre) : 1;
+			double probRight =  rightOcc / totalDocs;
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 
-			pair.set(left, right);
+			pair.set(AppearanceCountMapper
+					.removeCenturyPrefix(left), AppearanceCountMapper
+					.removeCenturyPrefix(right));
 
 			PMI.set(npmi);
 			context.write(pair, PMI);
