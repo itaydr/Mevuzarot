@@ -42,10 +42,7 @@ public class Main {
 	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1"; // Used for the c() fumction file - first job
 	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; // used for the npmi calculation file - second job
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
-	private static final String DECADE_SUM_PREFIX = "decade_";
 
-	private static BigInteger ENG_BIGRAM_COUNT = new BigInteger("6626604215");
-	private static BigInteger HEB_BIGRAM_COUNT = new BigInteger("252069581");
 
 	/**************************
 	 * 
@@ -209,9 +206,11 @@ public class Main {
 			Configuration conf = context.getConfiguration();
 			FileSystem fs = FileSystem.get(conf);
 
-			 Path inFile = new Path(conf.get("intermediatePath1") + HDFS_FIRST_SPLIT_SUFFIX);
-			//Path inFile = new Path(TMP_FILE_PATH_1 + HDFS_FIRST_SPLIT_SUFFIX);
-
+			Path inFile = new Path(conf.get("intermediatePath1") + HDFS_FIRST_SPLIT_SUFFIX);
+			
+			totalDocs = Double.parseDouble(conf.get("total_input_items_count"));
+			LOG.info("Total doc for corpus are - " + totalDocs + "  (" + conf.get("total_input_items_count") + ")");
+			
 			if (!fs.exists(inFile)) {
 				throw new IOException("File Not Found: " + inFile.toString());
 			}
@@ -394,8 +393,10 @@ public class Main {
 		conf.set("minPmi", args[2]);
 		conf.set("relMinPmi", args[3]);
 		
-		boolean usingStopWords = args[5].equals("1");
+		boolean usingStopWords = args[4].equals("1");
 		conf.setBoolean("usingStopWords", new Boolean(usingStopWords));
+		
+		conf.set("total_input_items_count", args[5]);
 		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
