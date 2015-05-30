@@ -4,3 +4,4 @@ _itay_creds.properties
 .recommenders
 HADOOP
 eng-2gram-1m
+Credentials.java

@@ -18,6 +18,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.s3.S3Credentials;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -380,14 +381,22 @@ public class Main {
 		LOG.info("Tool: Appearances Part");
 		LOG.info(" - input path: " + inputPath);
 		LOG.info(" - output path: " + intermediatePath1);
-
+		
 		Configuration conf = new Configuration();
 		conf.set("intermediatePath1", intermediatePath1);
 		conf.set("intermediatePath2", intermediatePath2);
 		
+		//conf.set("fs.s3n.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem");
+		//conf.set("fs.s3n.awsAccessKeyId",Credentials.AWS_ACCESS);
+		//conf.set("fs.s3n.awsSecretAccessKey",Credentials.AWS_SECRET);
+		//conf.set("fs.default.name","s3n://dsp132/heb-2gram-10K");
+		
 		conf.set("minPmi", args[2]);
 		conf.set("relMinPmi", args[3]);
-
+		
+		boolean usingStopWords = args[5].equals("1");
+		conf.setBoolean("usingStopWords", new Boolean(usingStopWords));
+		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
 		job1.setJarByClass(Main.class);
