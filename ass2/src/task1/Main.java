@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Array;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -39,26 +40,99 @@ public class Main {
 	
 	private static final Logger LOG = Logger.getAnonymousLogger();
 
-	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1"; // Used for the c() fumction file - first job
-	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; // used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1"; //"s3n://mevuzarot.task2/intermediate/1";// Used for the c() fumction file - first job
+	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; //"s3n://mevuzarot.task2/intermediate/2";// used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0"; //"s3n://mevuzarot.task2/intermediate/0";// used for the npmi calculation file - second job
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
 
-
+	
+	
 	/**************************
 	 * 
-	 * Appearance counting
+	 * Decade merge
 	 * 
-	 * 
+	 * Input - 2gram
+	 * output - decade_(w1 w2) -> count
 	 */
-	private static class AppearanceCountMapper extends
+	private static class DecadeMergeMapper extends
 			Mapper<LongWritable, Text, Text, IntWritable> {
 
 		// Objects for reuse
 		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
 		private final static IntWritable COUNT = new IntWritable();
 
 		private static final String LEFT_PREFIX = "left_";
-		private static final String RIGHT_PREFIX = "right_";
+		private static final String RIGHT_PREFIX = "rigt_";
+
+
+		@Override
+		public void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+
+			String[] arr = value.toString().trim().split("\\s+");
+			if (!AppearanceCountMapper.validateInput2gram(arr)) {
+				return;
+			}
+			
+			KEY.set(AppearanceCountMapper.appendCentury(arr[0] + " " + arr[1], arr[2])); //Left_198_w1
+			//VAL.set(arr[3]); // count
+			COUNT.set(Integer.parseInt(arr[3]));
+			context.write(KEY, COUNT);
+			
+		}
+	}
+
+	/**
+	 * 
+	 * Input - decade_(w1 w2) -> count
+	 * Output w1 w2 decade count
+	 * 
+	 * @author asaf
+	 *
+	 */
+	private static class DecadeMergeReducer extends
+			Reducer<Text, IntWritable, Text, Text> {
+		// Reuse objects
+
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
+
+		@Override
+		public void reduce(Text key, Iterable<IntWritable> values,
+				Context context) throws IOException, InterruptedException {
+			
+			long sum = 0;
+			for (IntWritable i : values) {
+				sum += i.get();
+			}
+			
+			String decade = key.toString().substring(0, 3); 
+			String w1_w2 = key.toString().substring(4, key.toString().length());
+			String[] arr = w1_w2.toString().trim().split("\\s+");
+			KEY.set(arr[0]);
+			VAL.set(arr[1] + " " + decade + " " + sum);
+			context.write(KEY,VAL);
+		}
+	}
+	
+	/**************************
+	 * 
+	 * Appearance counting
+	 * 
+	 * Input - w1 w2 year count
+	 * output - w1(side + year) -> count w1 w2
+	 */
+	private static class AppearanceCountMapper extends
+			Mapper<LongWritable, Text, Text, Text> {
+
+		// Objects for reuse
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
+		private final static IntWritable COUNT = new IntWritable();
+
+		private static final String LEFT_PREFIX = "left_";
+		private static final String RIGHT_PREFIX = "righ_";
 
 		private static String appendLeftPrefix(String word) {
 			if (word != null) {
@@ -76,8 +150,8 @@ public class Main {
 			return null;
 		}
 		
-		private static String appendCentury(String word, String year) throws IOException {
-			if (word != null && year != null && year.length() > 3) {
+		public static String appendCentury(String word, String year) throws IOException {
+			if (word != null && year != null && year.length() >= 3) {
 				return  year.substring(0, 3) + "_" + word;
 			}
 			
@@ -85,7 +159,7 @@ public class Main {
 					"Bad words for append century ::" + word + ", " + year);
 		}
 		
-		private static String removeCenturyPrefix(String word) throws IOException {
+		public static String removeCenturyPrefix(String word) throws IOException {
 			if (word != null && word.length() >= 4) {
 				return word.substring(4);
 			}
@@ -109,34 +183,54 @@ public class Main {
 				throws IOException, InterruptedException {
 
 			String[] arr = value.toString().trim().split("\\s+");
-			if (!validateInput2gram(arr)) {
-			return;
-			}
+
+			KEY.set(appendLeftPrefix(appendCentury(arr[0], arr[2]))); //Left_198_w1
+			VAL.set(arr[3] + " " + arr[0] + " " + arr[1]); // count w1 w2
+			context.write(KEY, VAL);
+			KEY.set(appendRightPrefix(appendCentury(arr[1], arr[2]))); // Right_198_w2
+			context.write(KEY, VAL);
 			
-			COUNT.set(Integer.parseInt(arr[3]));
-			KEY.set(appendLeftPrefix(appendCentury(arr[0], arr[2])));
-			context.write(KEY, COUNT);
-			KEY.set(appendLeftPrefix(appendCentury(arr[1], arr[2])));
-			context.write(KEY, COUNT);
+			//LOG.info("1::    " + value.toString() + "//// output - " + KEY+ " :: "  + VAL);
 		}
 	}
 
-	// First stage Reducer: Totals counts for each Token and Token Pair
+	/**
+	 * 
+	 * Input - w(side + year) count w2 w3
+	 * Output (multiple) w(side + year) sum count w2 w3 
+	 * 
+	 * @author asaf
+	 *
+	 */
 	private static class AppearanceCountReducer extends
-			Reducer<Text, IntWritable, Text, IntWritable> {
+			Reducer<Text, Text, Text, Text> {
 		// Reuse objects
 		private final static IntWritable SUM = new IntWritable();
+		private final static Text VAL = new Text();
+		private final static Set<String> CACHE = new HashSet<String>();
 
 		@Override
-		public void reduce(Text key, Iterable<IntWritable> values,
+		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
 			int sum = 0;
-			for (IntWritable value : values) {
-				sum += value.get();
+			String[] arr;
+			CACHE.clear();
+			for (Text value : values) {
+				arr = value.toString().trim().split("\\s+");
+				sum += Integer.parseInt(arr[0]);
+				CACHE.add(value.toString());
 			}
+			// 1::    """ tonal"	2006	52	48	37//// output - left_200_tonal" :: 52 """ tonal"
+			// left_188_( :::: 1 ( Dravidian ::: 1 ( Dravidian
+			//right_199_plus :::: 29 $900 plus ::: 95 29 $900 plus
+			//right_199_plus :::: 43 $16.50 plus ::: 95 43 $16.50 plus
+			//right_199_plus :::: 23 $16 plus ::: 95 23 $16 plus
 
-			SUM.set(sum);
-			context.write(key, SUM);
+			for (String str : CACHE) {
+				VAL.set(sum + " " + str);
+				context.write(key, VAL);
+				System.out.println(key + " :::: " + str + " ::: " + VAL);
+			}			
 		}
 	}
 	
@@ -144,116 +238,120 @@ public class Main {
 	 * 
 	 * Pairs PMI calculation
 	 * 
+	 * Input -  w(side + year) sum count w2 w3 
+	 * Output -  (w2 + w3 + decade) -> count w2-sum w3-sum
+	 * 
 	 * @author asaf
 	 *
 	 */
 
 	private static class PairsPMIMapper extends
-			Mapper<LongWritable, Text, PairOfStrings, IntWritable> {
+			Mapper<LongWritable, Text, PairOfStrings, Text> {
 
 		// Objects for reuse
 		private final static PairOfStrings PAIR = new PairOfStrings();
-		private final static IntWritable COUNT = new IntWritable(1);
+		private final static Text VAL = new Text();
 
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
 			String[] arr = value.toString().trim().split("\\s+");
-			if (!AppearanceCountMapper.validateInput2gram(arr)) {
-				return;
+			//in -left_190_$50	45 15 3 $50 gain
+			//out - (190_$50 , gain) -> left 15 3
+			String left = null;
+			String right = null, decade = null;
+			//(_89_1981, _1981) righ
+			if (arr[0].startsWith("l") ) {
+				left = arr[0].substring(9, arr[0].length());
+				right = arr[5];
+				decade = arr[0].substring(5, 8);
+			} else {
+				right = arr[0].substring(9, arr[0].length());
+				left = arr[5];
+				decade = arr[0].substring(5, 8);
+				//System.out.println("Right - " + arr[0] + ": right:" +right + ",  Left:" + left + "  , decade = " + decade);
 			}
 			
-			PAIR.set(AppearanceCountMapper.appendCentury(arr[0], arr[2]), 
-					AppearanceCountMapper.appendCentury(arr[1], arr[2]));
-			COUNT.set(Integer.parseInt(arr[3]));
-			context.write(PAIR, COUNT);
+			PAIR.set(decade + "_" + left, right);
+			VAL.set(arr[0].substring(0, 4)+ " " + arr[2] + " " + arr[3]);
+			context.write(PAIR, VAL);
+			
+			//System.out.println("Mapper - " + PAIR + "::::" + VAL );
 		}
 	}
 
+	/*
 	// Combiner
 	private static class PairsPMICombiner extends
-			Reducer<PairOfStrings, IntWritable, PairOfStrings, IntWritable> {
+			Reducer<PairOfStrings, Text, PairOfStrings, IntWritable> {
 		private static IntWritable SUM = new IntWritable();
 
 		@Override
-		public void reduce(PairOfStrings pair, Iterable<IntWritable> values,
+		public void reduce(PairOfStrings pair, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
 			int sum = 0;
-			for (IntWritable value : values) {
+			for (Text value : values) {
 				sum += value.get();
 			}
 			SUM.set(sum);
 			context.write(pair, SUM);
 		}
 	}
+	*/
 
+	/**
+	 * Input -   (w2 + w3 + decade) -> count w2-sum w3-sum
+	 * Output -  decade w2 w3 pmi
+	 * 
+	 * @author asaf
+	 *
+	 */
 	// Second Stage reducer: Finalizes PMI Calculation given
 	private static class PairsPMIReducer extends
-			Reducer<PairOfStrings, IntWritable, Text, Text> {
-
-		private static Map<String, Integer> termTotals = new HashMap<String, Integer>();
+			Reducer<PairOfStrings, Text, Text, Text> {
 
 		// TODO: set the number of items in the heb/eng corpus.
-		private static double totalDocs = 156215.0;
+		private static double totalDocs = 156215.0;////////////////////////////////////////////////
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
 
 		@Override
-		public void setup(Context context) throws IOException {
-			// TODO Read from intermediate output of first job
-			// and build in-memory map of terms to their individual totals
-			Configuration conf = context.getConfiguration();
-			FileSystem fs = FileSystem.get(conf);
-
-			Path inFile = new Path(conf.get("intermediatePath1") + HDFS_FIRST_SPLIT_SUFFIX);
-			
-			totalDocs = Double.parseDouble(conf.get("total_input_items_count"));
-			LOG.info("Total doc for corpus are - " + totalDocs + "  (" + conf.get("total_input_items_count") + ")");
-			
-			if (!fs.exists(inFile)) {
-				throw new IOException("File Not Found: " + inFile.toString());
-			}
-
-			BufferedReader reader = null;
-			try {
-				FSDataInputStream in = fs.open(inFile);
-				InputStreamReader inStream = new InputStreamReader(in);
-				reader = new BufferedReader(inStream);
-
-			} catch (FileNotFoundException e) {
-				throw new IOException(
-						"Exception thrown when trying to open file.");
-			}
-
-			String line = reader.readLine();
-			while (line != null) {
-
-				String[] parts = line.split("\\s+");
-				if (parts.length != 2) {
-					LOG.info("Input line did not have exactly 2 tokens: '"
-							+ line + "'");
-				} else {
-					termTotals.put(parts[0], Integer.parseInt(parts[1]));
-				}
-				line = reader.readLine();
-			}
-			
-			LOG.info("\n\n\n\nTerm totals length = " + termTotals.size() + "\n\n\n\n");
-
-			reader.close();
-
-		}
-
-		@Override
-		public void reduce(PairOfStrings pair, Iterable<IntWritable> values,
+		public void reduce(PairOfStrings pair, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			// Recieving pair and pair counts -> Sum these for this pair's total
-			// Only calculate PMI for pairs that occur 10 or more times
+			//(190_$50 , gain) -> left 15 3
 			int pairSum = 0;
-			for (IntWritable value : values) {
-				pairSum += value.get();
+			String last = "";
+			double rightOcc = -1, leftOcc = -1;
+			
+			for (Text value : values) {
+				//System.out.println("PMIIN -> " + pair + " >>> " + value);
+				
+				String[] arr = value.toString().trim().split("\\s+");
+				if (arr.length < 3) {
+					System.out.println("Bad array - " + value);
+					continue;
+				}
+				
+				pairSum = Integer.parseInt(arr[2]);
+				if (arr[0].startsWith("l")) {
+					leftOcc = Integer.parseInt(arr[1]);
+				}
+				else if (arr[0].startsWith("r")) {
+					rightOcc = Integer.parseInt(arr[1]);
+				}
+				else {
+					System.out.println("Error - not starting with l or r - " + value);
+				}
+				
+				last = value.toString();
 			}
+			
+			if(rightOcc == -1 || leftOcc == -1) {
+				System.out.println("Bad seatuation - " + last + "---"+ rightOcc+ ":" + leftOcc +"::::::" + pair + ">>> " );
+				return;
+			}
+			
 			// Look up individual totals for each member of pair
 			// Calculate PMI emit Pair or Text as key and Float as value
 			String left = pair.getLeftElement();
@@ -268,26 +366,17 @@ public class Main {
 				LOG.info("Null after removing prefix - (" + leftWithPre + ":" + rightWithPre + ")");
 				return;
 			}
-
-			if (termTotals == null) {
-				LOG.info("Term total in null");
-				return;
-			}
 			
 			double probPair = pairSum / totalDocs;
-			double leftOcc = termTotals.containsKey(leftWithPre) ? termTotals.get(leftWithPre) : 1;
 			double probLeft = leftOcc / totalDocs;
-			double rightOcc =  termTotals.containsKey(rightWithPre) ? termTotals.get(rightWithPre) : 1;
 			double probRight =  rightOcc / totalDocs;
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 			
-			pair.set(AppearanceCountMapper
-					.removeCenturyPrefix(left), AppearanceCountMapper
-					.removeCenturyPrefix(right));
 			KEY.set(left.substring(0, 3)); // The decade
-			VAL.set(pair.getLeftElement() + " " + pair.getRightElement() + " " + npmi);
+			VAL.set(AppearanceCountMapper
+					.removeCenturyPrefix(left) + " " + right + " " + npmi);
 			context.write(KEY, VAL);
 			
 		}
@@ -297,6 +386,8 @@ public class Main {
 	 * 
 	 * Pmi Filter
 	 * 
+	 * Input - decade w2 w3 pmi
+	 * Output - (decade) -> w2 w3 pmi
 	 * 
 	 */
 	private static class PmiFilterMapper extends
@@ -318,7 +409,13 @@ public class Main {
 		}
 	}
 	
-	// First stage Reducer: Totals counts for each Token and Token Pair
+	/**
+	 * Input - (decade) -> w2 w3 pmi
+	 * Output - w2 w3 pmi (only ones who passed the filter).
+	 * 
+	 * @author asaf
+	 *
+	 */
 	private static class PmiFilterReducer extends
 			Reducer<Text, PairOfStrings, PairOfStrings, Text> {
 		// Reuse objects
@@ -376,6 +473,7 @@ public class Main {
 		String outputPath = args[1];
 		String intermediatePath1 = TMP_FILE_PATH_1;
 		String intermediatePath2 = TMP_FILE_PATH_2;
+		String intermediatePath0 = TMP_FILE_PATH_0;
 
 		LOG.info("Tool: Appearances Part");
 		LOG.info(" - input path: " + inputPath);
@@ -384,6 +482,7 @@ public class Main {
 		Configuration conf = new Configuration();
 		conf.set("intermediatePath1", intermediatePath1);
 		conf.set("intermediatePath2", intermediatePath2);
+		conf.set("intermediatePath0", intermediatePath0);
 		
 		//conf.set("fs.s3n.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem");
 		//conf.set("fs.s3n.awsAccessKeyId",Credentials.AWS_ACCESS);
@@ -398,16 +497,38 @@ public class Main {
 		
 		conf.set("total_input_items_count", args[5]);
 		
+		// Second job
+		Job job0 = Job.getInstance(conf);
+		job0.setJobName("DecadeMergeCounter");
+		job0.setJarByClass(Main.class);
+		job0.setMapperClass(DecadeMergeMapper.class);
+		job0.setReducerClass(DecadeMergeReducer.class);
+
+		job0.setInputFormatClass(SequenceFileInputFormat.class);
+		job0.setOutputKeyClass(Text.class);
+		job0.setOutputValueClass(IntWritable.class);
+		
+		FileInputFormat.addInputPath(job0, new Path(args[0]));
+		FileOutputFormat.setOutputPath(job0, new Path(intermediatePath0));
+		
+		Path outputDir0 = new Path(intermediatePath0);
+		FileSystem.get(conf).delete(outputDir0, true);
+		
+		long startTime = System.currentTimeMillis();
+		boolean status = job0.waitForCompletion(true);
+		LOG.info("PairsPmiCounter Job Finished in "
+				+ (System.currentTimeMillis() - startTime) / 1000.0
+				+ " seconds");
+		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
 		job1.setJarByClass(Main.class);
 
-		FileInputFormat.setInputPaths(job1, new Path(inputPath));
+		FileInputFormat.setInputPaths(job1, new Path(intermediatePath0));
 		FileOutputFormat.setOutputPath(job1, new Path(intermediatePath1));
 
 		job1.setOutputKeyClass(Text.class);
-		job1.setOutputValueClass(IntWritable.class);
-		job1.setInputFormatClass(SequenceFileInputFormat.class);
+		job1.setOutputValueClass(Text.class);
 
 		job1.setMapperClass(AppearanceCountMapper.class);
 		job1.setCombinerClass(AppearanceCountReducer.class);
@@ -417,35 +538,36 @@ public class Main {
 		Path intermediateDir = new Path(intermediatePath1);
 		FileSystem.get(conf).delete(intermediateDir, true);
 
-		long startTime = System.currentTimeMillis();
+		 startTime = System.currentTimeMillis();
 		job1.waitForCompletion(true);
 		LOG.info("Apperance Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
+		
 		
 		// Second job
 		Job job2 = Job.getInstance(conf);
 		job2.setJobName("PairsPmiCounter");
 		job2.setJarByClass(Main.class);
 		job2.setMapperClass(PairsPMIMapper.class);
-		job2.setCombinerClass(PairsPMICombiner.class);
 		job2.setReducerClass(PairsPMIReducer.class);
 
-		job2.setInputFormatClass(SequenceFileInputFormat.class);
 		job2.setOutputKeyClass(PairOfStrings.class);
-		job2.setOutputValueClass(IntWritable.class);
+		job2.setOutputValueClass(Text.class);
 		
-		FileInputFormat.addInputPath(job2, new Path(args[0]));
+		FileInputFormat.addInputPath(job2, new Path(intermediatePath1));
 		FileOutputFormat.setOutputPath(job2, new Path(intermediatePath2));
 		
 		Path outputDir = new Path(intermediatePath2);
 		FileSystem.get(conf).delete(outputDir, true);
 		
 		startTime = System.currentTimeMillis();
-		boolean status = job2.waitForCompletion(true);
+		status = job2.waitForCompletion(true);
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
+		
+		System.exit(0);
 		
 		// Third job
 		Job job3 = Job.getInstance(conf);
@@ -461,8 +583,8 @@ public class Main {
 		FileOutputFormat.setOutputPath(job3, new Path(args[1]));
 		
 		// Delete the output directory if it exists already.
-		Path outDir = new Path(outputPath);
-		FileSystem.get(conf).delete(outDir, true);
+		//Path outDir = new Path(outputPath);
+		//FileSystem.get(conf).delete(outDir, true);
 
 		startTime = System.currentTimeMillis();
 		status = job3.waitForCompletion(true);
