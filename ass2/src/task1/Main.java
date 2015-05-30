@@ -7,9 +7,11 @@ import java.io.InputStreamReader;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import org.apache.hadoop.conf.Configuration;
@@ -193,7 +195,6 @@ public class Main {
 
 		private static Map<String, Integer> termTotals = new HashMap<String, Integer>();
 
-		private static DoubleWritable PMI = new DoubleWritable();
 		// TODO: set the number of items in the heb/eng corpus.
 		private static double totalDocs = 156215.0;
 		// Objects for reuse
@@ -207,8 +208,8 @@ public class Main {
 			Configuration conf = context.getConfiguration();
 			FileSystem fs = FileSystem.get(conf);
 
-			// Path inFile = new Path(conf.get("intermediatePath"));
-			Path inFile = new Path(TMP_FILE_PATH_1 + HDFS_FIRST_SPLIT_SUFFIX);
+			 Path inFile = new Path(conf.get("intermediatePath1") + HDFS_FIRST_SPLIT_SUFFIX);
+			//Path inFile = new Path(TMP_FILE_PATH_1 + HDFS_FIRST_SPLIT_SUFFIX);
 
 			if (!fs.exists(inFile)) {
 				throw new IOException("File Not Found: " + inFile.toString());
@@ -281,25 +282,20 @@ public class Main {
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
-
-			double sumInDecade = 1;
 			
-			//if (npmi > minPmi || (npmi / sumInDecade) >= relMinPmi) {
-				pair.set(AppearanceCountMapper
-						.removeCenturyPrefix(left), AppearanceCountMapper
-						.removeCenturyPrefix(right));
-
-				PMI.set(npmi);
-				KEY.set(left.substring(0, 3));
-				VAL.set(pair.getLeftElement() + " " + pair.getRightElement() + " " + npmi);
-				context.write(KEY, VAL);
-			//}
+			pair.set(AppearanceCountMapper
+					.removeCenturyPrefix(left), AppearanceCountMapper
+					.removeCenturyPrefix(right));
+			KEY.set(left.substring(0, 3)); // The decade
+			VAL.set(pair.getLeftElement() + " " + pair.getRightElement() + " " + npmi);
+			context.write(KEY, VAL);
+			
 		}
 	}
 	
 	/**************************
 	 * 
-	 * Appearance counting
+	 * Pmi Filter
 	 * 
 	 * 
 	 */
@@ -308,7 +304,6 @@ public class Main {
 
 		// Objects for reuse
 		private final static Text KEY = new Text();
-		private final static Text VAL = new Text();
 		private final static PairOfStrings STR = new PairOfStrings();
 
 		
@@ -318,11 +313,8 @@ public class Main {
 
 			String[] arr = value.toString().trim().split("\\s+");
 			KEY.set(arr[0]); // The decade
-			VAL.set(arr[1] + " " + arr[2]+ " " + arr[3]); // Rest of the info
-			
-			//LOG.info("Last map value --- " + KEY + ":: " + VAL);
 			STR.set(arr[1] + " " + arr[2], arr[3]);
-			context.write(KEY, STR);//VAL);
+			context.write(KEY, STR);
 		}
 	}
 	
@@ -334,6 +326,15 @@ public class Main {
 		private final static PairOfStrings PAIR = new PairOfStrings();
 		private final static Text VAL = new Text();
 
+		
+		
+		@Override
+		public void setup(Context context) throws IOException {
+			Configuration conf = context.getConfiguration();
+			minPmi = Double.parseDouble(conf.get("minPmi"));
+			relMinPmi = Double.parseDouble(conf.get("relMinPmi"));
+		}
+		
 		@Override
 		public void reduce(Text key, Iterable<PairOfStrings> values,
 				Context context) throws IOException, InterruptedException {
@@ -341,7 +342,7 @@ public class Main {
 			String[] arr = null;
 			PairOfStrings pair;
 			Iterator<PairOfStrings> it = values.iterator();
-			List<PairOfStrings> cache = new ArrayList<PairOfStrings>();
+			Set<PairOfStrings> cache = new HashSet<PairOfStrings>();
 			while (it.hasNext()) {
 				pair = it.next();
 				double npmi = Double.parseDouble(pair.getRightElement());
@@ -352,7 +353,7 @@ public class Main {
 			for (PairOfStrings p : cache) {
 				arr = p.getLeftElement().trim().split("\\s+");
 				double npmi = Double.parseDouble(p.getRightElement());
-				if (npmi > minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
+				if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
 					PAIR.set(arr[0], arr[1]);
 					VAL.set(p.getRightElement());
 					context.write(PAIR, VAL);
@@ -383,10 +384,7 @@ public class Main {
 		Configuration conf = new Configuration();
 		conf.set("intermediatePath1", intermediatePath1);
 		conf.set("intermediatePath2", intermediatePath2);
-		minPmi = Double.parseDouble(args[2]);
-		relMinPmi = Double.parseDouble(args[3]);
 		
-		// TODO: fetch from conf
 		conf.set("minPmi", args[2]);
 		conf.set("relMinPmi", args[3]);
 
