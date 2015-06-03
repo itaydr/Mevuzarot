@@ -82,6 +82,14 @@ public class Main {
 				return;
 			}
 			
+			//Configuration conf = context.getConfiguration();
+			//if (conf.get("one") == null) {
+			//	conf.set("one", "1");
+			//}
+			//else {
+			//	return;
+			//}
+			
 			W1.set(arr[0]);
 			W2.set(arr[1]);
 			DECADE.set(arr[2].substring(0, 3)); // 1998 - > 199
@@ -93,6 +101,14 @@ public class Main {
 			COUNT.set(Integer.parseInt(arr[3]));
 			TextKey.set(KEY.toString());
 			context.write(TextKey, COUNT);
+			
+			//TODO:
+			//COUNT.set(COUNT.get() + 2);
+			//context.write(TextKey, COUNT);
+			//ARRAY[0] = new Text("HELLO");
+			//KEY.set(ARRAY);
+			//TextKey.set(KEY.toString());
+			//context.write(TextKey, COUNT);
 		}
 	}
 
@@ -258,151 +274,165 @@ public class Main {
 	/************************
 	 * 
 	 * Pairs PMI calculation
-	 * 
-	 * Input -  w(side + year) sum count w2 w3 
-	 * Output -  (w2 + w3 + decade) -> count w2-sum w3-sum
+	 *  @itay- this is not the correct input.
+	 * Input -  a. 2-grams.
+	 * 			b. left w1 w2 decade count sum
+	 * 			c. right w1 w2 decade count sum - maybe order of words is different.
+	 * Output -  <w1, w2, decade> -> 
+	 * 			a. count.
+	 * 			b. l sum
+	 * 			c. r sum
 	 * 
 	 * @author asaf
 	 *
 	 */
 
 	private static class PairsPMIMapper extends
-			Mapper<LongWritable, Text, PairOfStrings, Text> {
+			Mapper<LongWritable, Text, Text, Text> {
 
 		// Objects for reuse
-		private final static PairOfStrings PAIR = new PairOfStrings();
 		private final static Text VAL = new Text();
+		private final static Text KEY = new Text();
 
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
-
+			//System.out.println("PMI mapper in - " + key + ":" + value);
 			String[] arr = value.toString().trim().split("\\s+");
-			//in -left_190_$50	45 15 3 $50 gain
-			//out - (190_$50 , gain) -> left 15 3
-			String left = null;
-			String right = null, decade = null;
-			//(_89_1981, _1981) righ
-			if (arr[0].startsWith("l") ) {
-				left = arr[0].substring(9, arr[0].length());
-				right = arr[5];
-				decade = arr[0].substring(5, 8);
-			} else {
-				right = arr[0].substring(9, arr[0].length());
-				left = arr[5];
-				decade = arr[0].substring(5, 8);
-				//System.out.println("Right - " + arr[0] + ": right:" +right + ",  Left:" + left + "  , decade = " + decade);
+			String first = arr[0]; // this is served as the type for left/right lines.
+			String w1, w2, decade, count;
+			// TODO: check if has 3 slots.
+			if (first.equals(LEFT)) {
+				//left w1 w2 decade count sum
+				w1 = arr[1];
+				w2 = arr[3];
+				decade = arr[2];
+				count = arr[5];
+				VAL.set(LEFT + S + count);
+			}
+			else if (first.equals(RIGHT)) {
+				// right w1 w2 decade count sum
+				w1 = arr[3];
+				w2 = arr[1];
+				decade = arr[2];
+				count = arr[5];
+				VAL.set(RIGHT + S + count);
+			}
+			else {
+				// 2-gram
+				w1 = arr[0];
+				w2 = arr[1];
+				decade = arr[2].substring(0, 3);
+				count = arr[3];
+				VAL.set(count);
 			}
 			
-			PAIR.set(decade + "_" + left, right);
-			VAL.set(arr[0].substring(0, 4)+ " " + arr[2] + " " + arr[3]);
-			context.write(PAIR, VAL);
+			/**
+			 * 
+			 * PMI reducer - """ 200 shies":l 3, count = 1, self = task1.Main$PairsPMIReducer@1c92025
+PMI reducer - """ shies" 200:3, count = 1, self = task1.Main$PairsPMIReducer@1c92025
+PMI reducer - 3 200 """:r shies", count = 1, self = task1.Main$PairsPMIReducer@1c92025
+
+			 * 
+			 * PMI reducer - """ 200 shies":l 3, count = 1, self = task1.Main$PairsPMIReducer@643d12f
+PMI reducer - """ shies" 200:3, count = 1, self = task1.Main$PairsPMIReducer@643d12f
+PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@643d12f
+
+			 * 
+			 */
 			
-			//System.out.println("Mapper - " + PAIR + "::::" + VAL );
+			//System.out.println("PMI mapper - " + KEY + ":" + VAL);
 			
-			//check it out here, for some reason the right pair are fucked up. (both pairs of the same word)
-			//Also fix the last job to be accurate.
+			KEY.set(w1 + S + w2 + S + decade);
+			context.write(KEY, VAL);
 		}
 	}
-
-	/*
-	// Combiner
-	private static class PairsPMICombiner extends
-			Reducer<PairOfStrings, Text, PairOfStrings, IntWritable> {
-		private static IntWritable SUM = new IntWritable();
-
-		@Override
-		public void reduce(PairOfStrings pair, Iterable<Text> values,
-				Context context) throws IOException, InterruptedException {
-			int sum = 0;
-			for (Text value : values) {
-				sum += value.get();
-			}
-			SUM.set(sum);
-			context.write(pair, SUM);
-		}
-	}
-	*/
-
+	
 	/**
-	 * Input -   (w2 + w3 + decade) -> count w2-sum w3-sum
-	 * Output -  decade w2 w3 pmi
+	 * Input -   <w1, w2, decade> - >
+	 * 									a. count
+	 * 									b. l count
+	 * 									c. r count
+	 * Output -  w1 w2 decade pmi
 	 * 
 	 * @author asaf
 	 *
 	 */
 	// Second Stage reducer: Finalizes PMI Calculation given
 	private static class PairsPMIReducer extends
-			Reducer<PairOfStrings, Text, Text, Text> {
+			Reducer<Text, Text, Text, Text> {
 
 		// TODO: set the number of items in the heb/eng corpus.
-		private static double totalDocs = 156215.0;////////////////////////////////////////////////
+		private static double totalDocs = 1000.0;////////////////////////////////////////////////
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
+		private final List<Text> CACHE = new ArrayList<Text>();
 
 		@Override
-		public void reduce(PairOfStrings pair, Iterable<Text> values,
+		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			//(190_$50 , gain) -> left 15 3
-			int pairSum = 0;
-			String last = "";
-			double rightOcc = -1, leftOcc = -1;
 			
+			Text last = null;
+			CACHE.clear();
+			int i = 0;
 			for (Text value : values) {
-				//System.out.println("PMIIN -> " + pair + " >>> " + value);
-				
+				//System.out.println("pmi reduce cache key = " + key + ", val = " + value);
+				last = value;
+				CACHE.add(new Text (value));
+				//System.out.println("PMI - val =" + value +", Cache - " + CACHE);
+				i++;
+			}
+			
+			// Must have 3 lines to calculate pmi
+			if (i != 3) {
+				System.out.println("PMI reducer - " + key +":"+ last + ", count = " + i + ", self = " + this);
+				for (Text value : CACHE)  {
+					context.write(key, value);
+				}
+				return;
+				//throw new IOException("Less than 3 lines in pmi reducer :" + i + ":::" + last);
+			}
+			
+			//System.out.println("PMI - Cache - " + CACHE);
+			
+			String keyArr[] = key.toString().trim().split("\\s+");
+			int leftSum = -1, rightSum = -1, count = -1;
+			for (Text value : CACHE) {
 				String[] arr = value.toString().trim().split("\\s+");
-				if (arr.length < 3) {
-					System.out.println("Bad array - " + value);
-					continue;
-				}
+				String first = arr[0]; // this is served as the type for left/right lines.
 				
-				pairSum = Integer.parseInt(arr[2]);
-				if (arr[0].startsWith("l")) {
-					leftOcc = Integer.parseInt(arr[1]);
+				if (first.equals(LEFT)) {
+					leftSum = Integer.valueOf(arr[1]);
 				}
-				else if (arr[0].startsWith("r")) {
-					rightOcc = Integer.parseInt(arr[1]);
+				else if (first.equals(RIGHT)) {
+					rightSum = Integer.valueOf(arr[1]);
 				}
 				else {
-					System.out.println("Error - not starting with l or r - " + value);
+					count = Integer.valueOf(arr[0]);
 				}
 				
-				last = value.toString();
+				//System.out.println("PMI reducer - key=" + key +": value="+ value + ", l = " + leftSum + ", r=" + rightSum +", c=" + count +  ", self = " + this);
+				
 			}
-			
-			if(rightOcc == -1 || leftOcc == -1) {
-				System.out.println("Bad seatuation - " + last + "---"+ rightOcc+ ":" + leftOcc +"::::::" + pair + ">>> " );
+						
+			if(leftSum == -1 || rightSum == -1 || count == -1) {
+				System.out.println("Bad seatuation ----"+ leftSum+ ":" + rightSum +"::::::" + key + ">>> " );
 				return;
 			}
-			
-			// Look up individual totals for each member of pair
-			// Calculate PMI emit Pair or Text as key and Float as value
-			String left = pair.getLeftElement();
-			String right = pair.getRightElement();
 
-			String leftWithPre = AppearanceCountMapper
-					.appendLeftPrefix(left);
-			String rightWithPre = AppearanceCountMapper
-					.appendRightPrefix(right);
-			
-			if (leftWithPre == null || rightWithPre == null) {
-				LOG.info("Null after removing prefix - (" + leftWithPre + ":" + rightWithPre + ")");
-				return;
-			}
-			
-			double probPair = pairSum / totalDocs;
-			double probLeft = leftOcc / totalDocs;
-			double probRight =  rightOcc / totalDocs;
+			double probPair = count / totalDocs;
+			double probLeft = leftSum / totalDocs;
+			double probRight =  rightSum / totalDocs;
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 			
-			KEY.set(left.substring(0, 3)); // The decade
-			VAL.set(AppearanceCountMapper
-					.removeCenturyPrefix(left) + " " + right + " " + npmi);
-			context.write(KEY, VAL);
+			//System.out.println("PMI - pair - " + probPair + ", left= " + probLeft + ", " + probRight + ", totalDocs = "+ totalDocs + ", pmi = "+ pmi + ", npmi = " + npmi);
 			
+			KEY.set(keyArr[0] + S + keyArr[1]); // w1
+			VAL.set(keyArr[2] +  S + npmi);
+			
+			context.write(KEY, VAL);
 		}
 	}
 	
@@ -410,16 +440,16 @@ public class Main {
 	 * 
 	 * Pmi Filter
 	 * 
-	 * Input - decade w2 w3 pmi
-	 * Output - (decade) -> w2 w3 pmi
+	 * Input -  w1 w2 decade pmi
+	 * Output - (decade) -> w1 w2 pmi
 	 * 
 	 */
 	private static class PmiFilterMapper extends
-			Mapper<LongWritable, Text, Text, PairOfStrings> {
+			Mapper<LongWritable, Text, Text, Text> {
 
 		// Objects for reuse
 		private final static Text KEY = new Text();
-		private final static PairOfStrings STR = new PairOfStrings();
+		private final static Text VAL = new Text();
 
 		
 		@Override
@@ -427,25 +457,26 @@ public class Main {
 				throws IOException, InterruptedException {
 
 			String[] arr = value.toString().trim().split("\\s+");
-			KEY.set(arr[0]); // The decade
-			STR.set(arr[1] + " " + arr[2], arr[3]);
-			context.write(KEY, STR);
+			KEY.set(arr[2]); // The decade
+			VAL.set(arr[0] + S + arr[1] + S + arr[3]);
+			context.write(KEY, VAL);
 		}
 	}
 	
 	/**
-	 * Input - (decade) -> w2 w3 pmi
+	 * Input - (decade) -> w1 w2 pmi
 	 * Output - w2 w3 pmi (only ones who passed the filter).
 	 * 
 	 * @author asaf
 	 *
 	 */
 	private static class PmiFilterReducer extends
-			Reducer<Text, PairOfStrings, PairOfStrings, Text> {
+			Reducer<Text, Text, Text, Text> {
 		// Reuse objects
 		// Objects for reuse
-		private final static PairOfStrings PAIR = new PairOfStrings();
+		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
+		private final static Set<Text> CACHE = new HashSet<Text>();
 
 		
 		
@@ -457,27 +488,28 @@ public class Main {
 		}
 		
 		@Override
-		public void reduce(Text key, Iterable<PairOfStrings> values,
+		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
 			double totalPmiInDecade = 0;
 			String[] arr = null;
-			PairOfStrings pair;
-			Iterator<PairOfStrings> it = values.iterator();
-			Set<PairOfStrings> cache = new HashSet<PairOfStrings>();
+			Text pair;
+			Iterator<Text> it = values.iterator();
+			CACHE.clear();
 			while (it.hasNext()) {
 				pair = it.next();
-				double npmi = Double.parseDouble(pair.getRightElement());
+				arr = pair.toString().trim().split("\\s+");
+				double npmi = Double.parseDouble(arr[2]);
 				totalPmiInDecade += npmi;
-				cache.add(pair);
+				CACHE.add(new Text(pair));
 			}
 
-			for (PairOfStrings p : cache) {
-				arr = p.getLeftElement().trim().split("\\s+");
-				double npmi = Double.parseDouble(p.getRightElement());
+			for (Text p : CACHE) {
+				arr = p.toString().trim().split("\\s+");
+				double npmi = Double.parseDouble(arr[2]);
 				if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
-					PAIR.set(arr[0], arr[1]);
-					VAL.set(p.getRightElement());
-					context.write(PAIR, VAL);
+					KEY.set(arr[0] + S +arr[1]);
+					VAL.set(String.valueOf(npmi));
+					context.write(KEY, VAL);
 				}	
 			}
 		}
@@ -567,10 +599,7 @@ public class Main {
 		job1.waitForCompletion(true);
 		LOG.info("Apperance Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
-				+ " seconds");
-		
-		System.exit(0);
-		
+				+ " seconds");		
 		
 		// Second job
 		Job job2 = Job.getInstance(conf);
@@ -579,10 +608,11 @@ public class Main {
 		job2.setMapperClass(PairsPMIMapper.class);
 		job2.setReducerClass(PairsPMIReducer.class);
 
-		job2.setOutputKeyClass(PairOfStrings.class);
+		job2.setOutputKeyClass(Text.class);
 		job2.setOutputValueClass(Text.class);
 		
-		FileInputFormat.addInputPath(job2, new Path(intermediatePath1));
+		// Read from 2 files!
+		FileInputFormat.setInputPaths(job2, new Path(intermediatePath0), new Path(intermediatePath1));
 		FileOutputFormat.setOutputPath(job2, new Path(intermediatePath2));
 		
 		Path outputDir = new Path(intermediatePath2);
@@ -594,8 +624,6 @@ public class Main {
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 		
-		System.exit(0);
-		
 		// Third job
 		Job job3 = Job.getInstance(conf);
 		job3.setJobName("Pmi Filter");
@@ -604,14 +632,14 @@ public class Main {
 		job3.setReducerClass(PmiFilterReducer.class);
 
 		job3.setMapOutputKeyClass(Text.class);
-		job3.setMapOutputValueClass(PairOfStrings.class);	
+		job3.setMapOutputValueClass(Text.class);	
 		
 		FileInputFormat.addInputPath(job3, new Path(intermediatePath2));
-		FileOutputFormat.setOutputPath(job3, new Path(args[1]));
+		FileOutputFormat.setOutputPath(job3, new Path(outputPath));
 		
 		// Delete the output directory if it exists already.
-		//Path outDir = new Path(outputPath);
-		//FileSystem.get(conf).delete(outDir, true);
+		Path outDir = new Path(outputPath);
+		FileSystem.get(conf).delete(outDir, true);
 
 		startTime = System.currentTimeMillis();
 		status = job3.waitForCompletion(true);
