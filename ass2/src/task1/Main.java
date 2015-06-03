@@ -229,7 +229,7 @@ public class Main {
 			for (String str : CACHE) {
 				VAL.set(sum + " " + str);
 				context.write(key, VAL);
-				System.out.println(key + " :::: " + str + " ::: " + VAL);
+				//System.out.println(key + " :::: " + str + " ::: " + VAL);
 			}			
 		}
 	}
@@ -277,6 +277,9 @@ public class Main {
 			context.write(PAIR, VAL);
 			
 			//System.out.println("Mapper - " + PAIR + "::::" + VAL );
+			
+			check it out here, for some reason the right pair are fucked up. (both pairs of the same word)
+			Also fix the last job to be accurate.
 		}
 	}
 
