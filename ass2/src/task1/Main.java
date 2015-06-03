@@ -20,6 +20,7 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.s3.S3Credentials;
+import org.apache.hadoop.io.ArrayWritable;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
@@ -44,23 +45,29 @@ public class Main {
 	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; //"s3n://mevuzarot.task2/intermediate/2";// used for the npmi calculation file - second job
 	private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0"; //"s3n://mevuzarot.task2/intermediate/0";// used for the npmi calculation file - second job
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
-
 	
+	private static final int LEFT = 1;
+	private static final int RIGHT = 2;
+
 	
 	/**************************
 	 * 
 	 * Decade merge
 	 * 
 	 * Input - 2gram
-	 * output - decade_(w1 w2) -> count
+	 * output - [w1 w2 decade] -> count
 	 */
 	private static class DecadeMergeMapper extends
 			Mapper<LongWritable, Text, Text, IntWritable> {
 
 		// Objects for reuse
-		private final static Text KEY = new Text();
-		private final static Text VAL = new Text();
+		private final static TextArrayWritable KEY = new TextArrayWritable();
+		private final static Text TextKey = new Text();
+		private final static Text W1 = new Text();
+		private final static Text W2 = new Text();
+		private final static Text DECADE = new Text();
 		private final static IntWritable COUNT = new IntWritable();
+		private final static Text ARRAY[] = new Text[3];
 
 		private static final String LEFT_PREFIX = "left_";
 		private static final String RIGHT_PREFIX = "rigt_";
@@ -75,17 +82,23 @@ public class Main {
 				return;
 			}
 			
-			KEY.set(AppearanceCountMapper.appendCentury(arr[0] + " " + arr[1], arr[2])); //Left_198_w1
-			//VAL.set(arr[3]); // count
-			COUNT.set(Integer.parseInt(arr[3]));
-			context.write(KEY, COUNT);
+			W1.set(arr[0]);
+			W2.set(arr[1]);
+			DECADE.set(arr[2].substring(0, 3)); // 1998 - > 199
+			ARRAY[0] = W1;
+			ARRAY[1] = W2;
+			ARRAY[2] = DECADE;
 			
+			KEY.set(ARRAY); 
+			COUNT.set(Integer.parseInt(arr[3]));
+			TextKey.set(KEY.toString());
+			context.write(TextKey, COUNT);
 		}
 	}
 
 	/**
 	 * 
-	 * Input - decade_(w1 w2) -> count
+	 * Input - [w1 w2 decade] -> count
 	 * Output w1 w2 decade count
 	 * 
 	 * @author asaf
@@ -95,7 +108,6 @@ public class Main {
 			Reducer<Text, IntWritable, Text, Text> {
 		// Reuse objects
 
-		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
 
 		@Override
@@ -107,12 +119,8 @@ public class Main {
 				sum += i.get();
 			}
 			
-			String decade = key.toString().substring(0, 3); 
-			String w1_w2 = key.toString().substring(4, key.toString().length());
-			String[] arr = w1_w2.toString().trim().split("\\s+");
-			KEY.set(arr[0]);
-			VAL.set(arr[1] + " " + decade + " " + sum);
-			context.write(KEY,VAL);
+			VAL.set(String.valueOf(sum));
+			context.write(key,VAL);
 		}
 	}
 	
@@ -278,8 +286,8 @@ public class Main {
 			
 			//System.out.println("Mapper - " + PAIR + "::::" + VAL );
 			
-			check it out here, for some reason the right pair are fucked up. (both pairs of the same word)
-			Also fix the last job to be accurate.
+			//check it out here, for some reason the right pair are fucked up. (both pairs of the same word)
+			//Also fix the last job to be accurate.
 		}
 	}
 
@@ -508,8 +516,9 @@ public class Main {
 		job0.setReducerClass(DecadeMergeReducer.class);
 
 		job0.setInputFormatClass(SequenceFileInputFormat.class);
-		job0.setOutputKeyClass(Text.class);
-		job0.setOutputValueClass(IntWritable.class);
+		// Set Output and Input Parameters
+	    job0.setOutputKeyClass(Text.class);
+	    job0.setOutputValueClass(IntWritable.class);
 		
 		FileInputFormat.addInputPath(job0, new Path(args[0]));
 		FileOutputFormat.setOutputPath(job0, new Path(intermediatePath0));
@@ -522,6 +531,8 @@ public class Main {
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
+		
+		System.exit(0);
 		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
