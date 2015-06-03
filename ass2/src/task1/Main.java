@@ -45,10 +45,13 @@ public class Main {
 	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; //"s3n://mevuzarot.task2/intermediate/2";// used for the npmi calculation file - second job
 	private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0"; //"s3n://mevuzarot.task2/intermediate/0";// used for the npmi calculation file - second job
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
-	
-	private static final int LEFT = 1;
-	private static final int RIGHT = 2;
 
+	private static final String LEFT = "l";
+	private static final String RIGHT = "r";
+	private static final String S = " ";
+	
+	private static final String LEFT_PREFIX = "l_";
+	private static final String RIGHT_PREFIX = "r_";
 	
 	/**************************
 	 * 
@@ -68,9 +71,6 @@ public class Main {
 		private final static Text DECADE = new Text();
 		private final static IntWritable COUNT = new IntWritable();
 		private final static Text ARRAY[] = new Text[3];
-
-		private static final String LEFT_PREFIX = "left_";
-		private static final String RIGHT_PREFIX = "rigt_";
 
 
 		@Override
@@ -126,10 +126,10 @@ public class Main {
 	
 	/**************************
 	 * 
-	 * Appearance counting
+	 *  1 word Appearance counting
 	 * 
-	 * Input - w1 w2 year count
-	 * output - w1(side + year) -> count w1 w2
+	 * Input - w1 w2 decade count
+	 * output - <left, w1 ,decade> -> w2 count
 	 */
 	private static class AppearanceCountMapper extends
 			Mapper<LongWritable, Text, Text, Text> {
@@ -137,6 +137,7 @@ public class Main {
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
+		
 		private final static IntWritable COUNT = new IntWritable();
 
 		private static final String LEFT_PREFIX = "left_";
@@ -190,12 +191,22 @@ public class Main {
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
+			
+			 //* Input - w1 w2 decade count
+			 //* output - <w1, left, decade> -> w2 count
+			 
+			 
 			String[] arr = value.toString().trim().split("\\s+");
-
-			KEY.set(appendLeftPrefix(appendCentury(arr[0], arr[2]))); //Left_198_w1
-			VAL.set(arr[3] + " " + arr[0] + " " + arr[1]); // count w1 w2
+			String w1 = arr[0];
+			String w2 = arr[1];
+			String decade = arr[2];
+			String count = arr[3];
+			
+			KEY.set(LEFT + S + w1 + S + decade); // w1 l decade
+			VAL.set(w2 + S + count); // w2 count
 			context.write(KEY, VAL);
-			KEY.set(appendRightPrefix(appendCentury(arr[1], arr[2]))); // Right_198_w2
+			VAL.set(w1 + S + count); // w1 count
+			KEY.set(RIGHT + S + w2 + S + decade); // w2 r decade
 			context.write(KEY, VAL);
 			
 			//LOG.info("1::    " + value.toString() + "//// output - " + KEY+ " :: "  + VAL);
@@ -204,8 +215,8 @@ public class Main {
 
 	/**
 	 * 
-	 * Input - w(side + year) count w2 w3
-	 * Output (multiple) w(side + year) sum count w2 w3 
+	 * Input -  <left, w1, decade> -> w2 count
+	 * Output (multiple) left w1 w2 decade count sum
 	 * 
 	 * @author asaf
 	 *
@@ -213,7 +224,6 @@ public class Main {
 	private static class AppearanceCountReducer extends
 			Reducer<Text, Text, Text, Text> {
 		// Reuse objects
-		private final static IntWritable SUM = new IntWritable();
 		private final static Text VAL = new Text();
 		private final static Set<String> CACHE = new HashSet<String>();
 
@@ -225,9 +235,12 @@ public class Main {
 			CACHE.clear();
 			for (Text value : values) {
 				arr = value.toString().trim().split("\\s+");
-				sum += Integer.parseInt(arr[0]);
+				sum += Integer.parseInt(arr[1]);
 				CACHE.add(value.toString());
 			}
+			
+			 //* Input -  <left, w1, decade> -> w2 count
+			 //* Output (multiple) left w1 decade w2 count sum
 			// 1::    """ tonal"	2006	52	48	37//// output - left_200_tonal" :: 52 """ tonal"
 			// left_188_( :::: 1 ( Dravidian ::: 1 ( Dravidian
 			//right_199_plus :::: 29 $900 plus ::: 95 29 $900 plus
@@ -235,7 +248,7 @@ public class Main {
 			//right_199_plus :::: 23 $16 plus ::: 95 23 $16 plus
 
 			for (String str : CACHE) {
-				VAL.set(sum + " " + str);
+				VAL.set(str + S + sum);
 				context.write(key, VAL);
 				//System.out.println(key + " :::: " + str + " ::: " + VAL);
 			}			
@@ -532,8 +545,6 @@ public class Main {
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 		
-		System.exit(0);
-		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
 		job1.setJarByClass(Main.class);
@@ -557,6 +568,8 @@ public class Main {
 		LOG.info("Apperance Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
+		
+		System.exit(0);
 		
 		
 		// Second job
