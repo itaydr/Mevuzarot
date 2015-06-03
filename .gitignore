@@ -5,3 +5,6 @@ _itay_creds.properties
 HADOOP
 eng-2gram-1m
 Credentials.java
+Jars/ass2_only_first.jar
+Jars/ass2_runner.jar
+Jars/ass2_without_delete.jar
