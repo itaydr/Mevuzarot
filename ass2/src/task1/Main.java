@@ -1,27 +1,16 @@
 package task1;
 
-import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.lang.reflect.Array;
-import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.fs.s3.S3Credentials;
-import org.apache.hadoop.io.ArrayWritable;
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -32,7 +21,16 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import edu.umd.cloud9.io.pair.PairOfStrings;
+/**
+ * 
+ * Need to calculate the N for each decade. totalDocs will not do it!
+ * 
+ * 
+ * 
+ * @author asaf
+ *
+ */
+
 
 public class Main {
 
@@ -49,9 +47,6 @@ public class Main {
 	private static final String LEFT = "l";
 	private static final String RIGHT = "r";
 	private static final String S = " ";
-	
-	private static final String LEFT_PREFIX = "l_";
-	private static final String RIGHT_PREFIX = "r_";
 	
 	/**************************
 	 * 
@@ -218,11 +213,11 @@ public class Main {
 			String decade = arr[2];
 			String count = arr[3];
 			
-			KEY.set(LEFT + S + w1 + S + decade); // w1 l decade
+			KEY.set(LEFT + S + w1 + S + decade); // l w1 decade
 			VAL.set(w2 + S + count); // w2 count
 			context.write(KEY, VAL);
 			VAL.set(w1 + S + count); // w1 count
-			KEY.set(RIGHT + S + w2 + S + decade); // w2 r decade
+			KEY.set(RIGHT + S + w2 + S + decade); // r w2 decade
 			context.write(KEY, VAL);
 			
 			//LOG.info("1::    " + value.toString() + "//// output - " + KEY+ " :: "  + VAL);
@@ -255,14 +250,6 @@ public class Main {
 				CACHE.add(value.toString());
 			}
 			
-			 //* Input -  <left, w1, decade> -> w2 count
-			 //* Output (multiple) left w1 decade w2 count sum
-			// 1::    """ tonal"	2006	52	48	37//// output - left_200_tonal" :: 52 """ tonal"
-			// left_188_( :::: 1 ( Dravidian ::: 1 ( Dravidian
-			//right_199_plus :::: 29 $900 plus ::: 95 29 $900 plus
-			//right_199_plus :::: 43 $16.50 plus ::: 95 43 $16.50 plus
-			//right_199_plus :::: 23 $16 plus ::: 95 23 $16 plus
-
 			for (String str : CACHE) {
 				VAL.set(str + S + sum);
 				context.write(key, VAL);
@@ -539,16 +526,12 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		conf.set("intermediatePath1", intermediatePath1);
 		conf.set("intermediatePath2", intermediatePath2);
 		conf.set("intermediatePath0", intermediatePath0);
-		
-		//conf.set("fs.s3n.impl", "org.apache.hadoop.fs.s3native.NativeS3FileSystem");
-		//conf.set("fs.s3n.awsAccessKeyId",Credentials.AWS_ACCESS);
-		//conf.set("fs.s3n.awsSecretAccessKey",Credentials.AWS_SECRET);
-		//conf.set("fs.default.name","s3n://dsp132/heb-2gram-10K");
-		
+				
 		conf.set("minPmi", args[2]);
 		conf.set("relMinPmi", args[3]);
 		
 		boolean usingStopWords = args[4].equals("1");
+		boolean isRunningInCloud = args.length >= 7 && args[6].equals("1");
 		conf.setBoolean("usingStopWords", new Boolean(usingStopWords));
 		
 		conf.set("total_input_items_count", args[5]);
@@ -568,9 +551,10 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		FileInputFormat.addInputPath(job0, new Path(args[0]));
 		FileOutputFormat.setOutputPath(job0, new Path(intermediatePath0));
 		
-		Path outputDir0 = new Path(intermediatePath0);
-		FileSystem.get(conf).delete(outputDir0, true);
-		
+		if (!isRunningInCloud) {
+			Path outputDir0 = new Path(intermediatePath0);
+			FileSystem.get(conf).delete(outputDir0, true);
+		}
 		long startTime = System.currentTimeMillis();
 		boolean status = job0.waitForCompletion(true);
 		LOG.info("PairsPmiCounter Job Finished in "
@@ -592,8 +576,10 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		job1.setReducerClass(AppearanceCountReducer.class);
 
 		// Delete the output directory if it exists already.
-		Path intermediateDir = new Path(intermediatePath1);
-		FileSystem.get(conf).delete(intermediateDir, true);
+		if (!isRunningInCloud) {
+			Path intermediateDir = new Path(intermediatePath1);
+			FileSystem.get(conf).delete(intermediateDir, true);
+		}
 
 		 startTime = System.currentTimeMillis();
 		job1.waitForCompletion(true);
@@ -615,8 +601,10 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		FileInputFormat.setInputPaths(job2, new Path(intermediatePath0), new Path(intermediatePath1));
 		FileOutputFormat.setOutputPath(job2, new Path(intermediatePath2));
 		
-		Path outputDir = new Path(intermediatePath2);
-		FileSystem.get(conf).delete(outputDir, true);
+		if (!isRunningInCloud) {
+			Path outputDir = new Path(intermediatePath2);
+			FileSystem.get(conf).delete(outputDir, true);
+		}
 		
 		startTime = System.currentTimeMillis();
 		status = job2.waitForCompletion(true);
@@ -638,8 +626,10 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		FileOutputFormat.setOutputPath(job3, new Path(outputPath));
 		
 		// Delete the output directory if it exists already.
-		Path outDir = new Path(outputPath);
-		FileSystem.get(conf).delete(outDir, true);
+		if (!isRunningInCloud) {
+			Path outDir = new Path(outputPath);
+			FileSystem.get(conf).delete(outDir, true);
+		}
 
 		startTime = System.currentTimeMillis();
 		status = job3.waitForCompletion(true);

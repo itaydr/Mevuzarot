@@ -44,7 +44,8 @@ public class AWSManager {
 	        		minPmi,
 	        		relMinPmi,
 	        		useStopWords,
-	        		useEnglishFile ? ENG_BIGRAM_COUNT : HEB_BIGRAM_COUNT
+	        		useEnglishFile ? ENG_BIGRAM_COUNT : HEB_BIGRAM_COUNT,
+	        		"1"
 	        		);
 	     
 	    StepConfig stepConfig = new StepConfig()
