@@ -39,9 +39,17 @@ public class Main {
 	
 	private static final Logger LOG = Logger.getAnonymousLogger();
 
-	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1"; //"s3n://mevuzarot.task2/intermediate/1";// Used for the c() fumction file - first job
-	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2"; //"s3n://mevuzarot.task2/intermediate/2";// used for the npmi calculation file - second job
-	private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0"; //"s3n://mevuzarot.task2/intermediate/0";// used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_1 = "s3n://mevuzarot.task2/intermediate/1";//"/user/hduser/ass_2_intermediate_1"// Used for the c() fumction file - first job
+	private static final String TMP_FILE_PATH_2 = "s3n://mevuzarot.task2/intermediate/2";//"/user/hduser/ass_2_intermediate_2" used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_0 = "s3n://mevuzarot.task2/intermediate/0";//"/user/hduser/ass_2_intermediate_0"// used for the npmi calculation file - second job
+	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "s3n://mevuzarot.task2/intermediate/decade_bigram_count";//"/user/hduser/ass_2_intermediate_decade_bigram_count"// used for the npmi calculation file - second job
+	//private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1";// Used for the c() fumction file - first job
+	//private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2";// used for the npmi calculation file - second job
+	//private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0";// used for the npmi calculation file - second job
+	//private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "/user/hduser/ass_2_intermediate_decade_bigram_count";// used for the npmi calculation file - second job
+	
+	
+	
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
 
 	private static final String LEFT = "l";
@@ -137,10 +145,79 @@ public class Main {
 	
 	/**************************
 	 * 
-	 *  1 word Appearance counting
+	 * Decade merge
 	 * 
 	 * Input - w1 w2 decade count
-	 * output - <left, w1 ,decade> -> w2 count
+	 * output - [decade] -> w1 w2 count
+	 */
+	private static class DecadeBigramCountMapper extends
+			Mapper<LongWritable, Text, Text, Text> {
+
+		// Objects for reuse
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
+
+
+		@Override
+		public void map(LongWritable key, Text value, Context context)
+				throws IOException, InterruptedException {
+
+			String[] arr = value.toString().trim().split("\\s+");
+			
+			KEY.set(arr[2]);
+			VAL.set(arr[0] + S + arr[1] + S + arr[3]);
+			context.write(KEY, VAL);
+		}
+	}
+
+	/**
+	 * 
+	 * Input - [decade] -> w1 w2 count
+	 * Output w1 w2 decade count totalDecade
+	 * 
+	 * @author asaf
+	 *
+	 */
+	private static class DecadeBigramCountReducer extends
+			Reducer<Text, Text, Text, Text> {
+		// Reuse objects
+
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
+		private final static Set<String> CACHE = new HashSet<String>();
+
+		@Override
+		public void reduce(Text key, Iterable<Text> values,
+				Context context) throws IOException, InterruptedException {
+			
+			CACHE.clear();
+			long sum = 0;
+			for (Text value : values) {
+				String valStr = value.toString();
+				String arr[] = valStr.trim().split("\\s+");
+				int count = Integer.parseInt(arr[2]);
+				sum += count;
+				
+				CACHE.add(valStr);
+			}
+			
+			String decade = key.toString();
+			for (String value : CACHE) {
+				String arr[] = value.trim().split("\\s+");
+				KEY.set(arr[0]);
+				VAL.set(arr[1] + S + decade + S + arr[2] + S + String.valueOf(sum));
+				context.write(KEY,VAL);
+			}
+		}
+	}
+	
+	
+	/**************************
+	 * 
+	 *  1 word Appearance counting
+	 * 
+	 * Input - w1 w2 decade count totalDecade
+	 * output - <left, w1 ,decade> -> w2 count 
 	 */
 	private static class AppearanceCountMapper extends
 			Mapper<LongWritable, Text, Text, Text> {
@@ -148,46 +225,7 @@ public class Main {
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
-		
-		private final static IntWritable COUNT = new IntWritable();
-
-		private static final String LEFT_PREFIX = "left_";
-		private static final String RIGHT_PREFIX = "righ_";
-
-		private static String appendLeftPrefix(String word) {
-			if (word != null) {
-				return LEFT_PREFIX + word;
-			}
-
-			return null;
-		}
-
-		private static String appendRightPrefix(String word) {
-			if (word != null) {
-				return RIGHT_PREFIX + word;
-			}
-
-			return null;
-		}
-		
-		public static String appendCentury(String word, String year) throws IOException {
-			if (word != null && year != null && year.length() >= 3) {
-				return  year.substring(0, 3) + "_" + word;
-			}
-			
-			throw new IOException(
-					"Bad words for append century ::" + word + ", " + year);
-		}
-		
-		public static String removeCenturyPrefix(String word) throws IOException {
-			if (word != null && word.length() >= 4) {
-				return word.substring(4);
-			}
-	
-			throw new IOException(
-					"Bad words for remove century ::" + word);
-		}
-		
+				
 		private static boolean validateInput2gram(String[] lineArray) {
 			 if(lineArray.length >= 4 && lineArray[2].length() >= 4) {
 				 return true;
@@ -203,8 +241,8 @@ public class Main {
 				throws IOException, InterruptedException {
 
 			
-			 //* Input - w1 w2 decade count
-			 //* output - <w1, left, decade> -> w2 count
+			 //* Input - w1 w2 decade count decadeCount
+			 //* output - <w1, left, decade> -> w2 count decadeCount
 			 
 			 
 			String[] arr = value.toString().trim().split("\\s+");
@@ -213,7 +251,7 @@ public class Main {
 			String decade = arr[2];
 			String count = arr[3];
 			
-			KEY.set(LEFT + S + w1 + S + decade); // l w1 decade
+			KEY.set(LEFT + S + w1 + S + decade); // l w1 decade decadeCount
 			VAL.set(w2 + S + count); // w2 count
 			context.write(KEY, VAL);
 			VAL.set(w1 + S + count); // w1 count
@@ -227,7 +265,7 @@ public class Main {
 	/**
 	 * 
 	 * Input -  <left, w1, decade> -> w2 count
-	 * Output (multiple) left w1 w2 decade count sum
+	 * Output (multiple) left w1 w2 decade count sum 
 	 * 
 	 * @author asaf
 	 *
@@ -262,13 +300,13 @@ public class Main {
 	 * 
 	 * Pairs PMI calculation
 	 *  @itay- this is not the correct input.
-	 * Input -  a. 2-grams.
-	 * 			b. left w1 w2 decade count sum
+	 * Input -  a. w1 w2 decade count decadeCount
+	 * 			b. left w1 w2 decade count  sum
 	 * 			c. right w1 w2 decade count sum - maybe order of words is different.
 	 * Output -  <w1, w2, decade> -> 
-	 * 			a. count.
+	 * 			a. count decadeCount
 	 * 			b. l sum
-	 * 			c. r sum
+	 * 			c. r sum 
 	 * 
 	 * @author asaf
 	 *
@@ -286,7 +324,7 @@ public class Main {
 			//System.out.println("PMI mapper in - " + key + ":" + value);
 			String[] arr = value.toString().trim().split("\\s+");
 			String first = arr[0]; // this is served as the type for left/right lines.
-			String w1, w2, decade, count;
+			String w1, w2, decade, count, decadeCount;
 			// TODO: check if has 3 slots.
 			if (first.equals(LEFT)) {
 				//left w1 w2 decade count sum
@@ -302,15 +340,17 @@ public class Main {
 				w2 = arr[1];
 				decade = arr[2];
 				count = arr[5];
+				decadeCount = arr[5];
 				VAL.set(RIGHT + S + count);
 			}
 			else {
 				// 2-gram
 				w1 = arr[0];
 				w2 = arr[1];
-				decade = arr[2].substring(0, 3);
+				decade = arr[2];
 				count = arr[3];
-				VAL.set(count);
+				decadeCount = arr[4];
+				VAL.set(count + S + decadeCount);
 			}
 			
 			/**
@@ -336,7 +376,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 	
 	/**
 	 * Input -   <w1, w2, decade> - >
-	 * 									a. count
+	 * 									a. count decadeCount
 	 * 									b. l count
 	 * 									c. r count
 	 * Output -  w1 w2 decade pmi
@@ -348,8 +388,6 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 	private static class PairsPMIReducer extends
 			Reducer<Text, Text, Text, Text> {
 
-		// TODO: set the number of items in the heb/eng corpus.
-		private static double totalDocs = 1000.0;////////////////////////////////////////////////
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
@@ -384,6 +422,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 			
 			String keyArr[] = key.toString().trim().split("\\s+");
 			int leftSum = -1, rightSum = -1, count = -1;
+			double decadeCount = -1;
 			for (Text value : CACHE) {
 				String[] arr = value.toString().trim().split("\\s+");
 				String first = arr[0]; // this is served as the type for left/right lines.
@@ -396,23 +435,29 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 				}
 				else {
 					count = Integer.valueOf(arr[0]);
+					decadeCount = Integer.parseInt(arr[1]);
 				}
 				
 				//System.out.println("PMI reducer - key=" + key +": value="+ value + ", l = " + leftSum + ", r=" + rightSum +", c=" + count +  ", self = " + this);
 				
 			}
 						
-			if(leftSum == -1 || rightSum == -1 || count == -1) {
-				System.out.println("Bad seatuation ----"+ leftSum+ ":" + rightSum +"::::::" + key + ">>> " );
+			if(leftSum == -1 || rightSum == -1 || count == -1 || decadeCount == -1 || decadeCount == 0) {
+				System.out.println("Bad seatuation ----"+ leftSum+ ":" + rightSum + ":" + decadeCount + "::::::" + key + ">>> " );
 				return;
 			}
 
-			double probPair = count / totalDocs;
-			double probLeft = leftSum / totalDocs;
-			double probRight =  rightSum / totalDocs;
+			double probPair = count / decadeCount;
+			double probLeft = leftSum / decadeCount;
+			double probRight =  rightSum / decadeCount;
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
+			
+			System.out.println("probPair :" + probPair + ", probLeft = " + probLeft + 
+					"probRight :" + probRight + "pmi :" + pmi
+					+ "npmi :" + npmi);
+			
 			
 			//System.out.println("PMI - pair - " + probPair + ", left= " + probLeft + ", " + probRight + ", totalDocs = "+ totalDocs + ", pmi = "+ pmi + ", npmi = " + npmi);
 			
@@ -537,27 +582,51 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		conf.set("total_input_items_count", args[5]);
 		
 		// Second job
-		Job job0 = Job.getInstance(conf);
-		job0.setJobName("DecadeMergeCounter");
-		job0.setJarByClass(Main.class);
-		job0.setMapperClass(DecadeMergeMapper.class);
-		job0.setReducerClass(DecadeMergeReducer.class);
+		Job mergeDecadesJob = Job.getInstance(conf);
+		mergeDecadesJob.setJobName("DecadeMergeCounter");
+		mergeDecadesJob.setJarByClass(Main.class);
+		mergeDecadesJob.setMapperClass(DecadeMergeMapper.class);
+		mergeDecadesJob.setReducerClass(DecadeMergeReducer.class);
 
-		job0.setInputFormatClass(SequenceFileInputFormat.class);
+		mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
 		// Set Output and Input Parameters
-	    job0.setOutputKeyClass(Text.class);
-	    job0.setOutputValueClass(IntWritable.class);
+		mergeDecadesJob.setOutputKeyClass(Text.class);
+		mergeDecadesJob.setOutputValueClass(IntWritable.class);
 		
-		FileInputFormat.addInputPath(job0, new Path(args[0]));
-		FileOutputFormat.setOutputPath(job0, new Path(intermediatePath0));
+		FileInputFormat.addInputPath(mergeDecadesJob, new Path(args[0]));
+		FileOutputFormat.setOutputPath(mergeDecadesJob, new Path(intermediatePath0));
 		
 		if (!isRunningInCloud) {
 			Path outputDir0 = new Path(intermediatePath0);
 			FileSystem.get(conf).delete(outputDir0, true);
 		}
 		long startTime = System.currentTimeMillis();
-		boolean status = job0.waitForCompletion(true);
+		boolean status = mergeDecadesJob.waitForCompletion(true);
 		LOG.info("PairsPmiCounter Job Finished in "
+				+ (System.currentTimeMillis() - startTime) / 1000.0
+				+ " seconds");
+		
+		// Second job
+		Job decade2gramCountJob = Job.getInstance(conf);
+		decade2gramCountJob.setJobName("DecadeSumCounter");
+		decade2gramCountJob.setJarByClass(Main.class);
+		decade2gramCountJob.setMapperClass(DecadeBigramCountMapper.class);
+		decade2gramCountJob.setReducerClass(DecadeBigramCountReducer.class);
+
+		// Set Output and Input Parameters
+		decade2gramCountJob.setOutputKeyClass(Text.class);
+		decade2gramCountJob.setOutputValueClass(Text.class);
+				
+		FileInputFormat.addInputPath(decade2gramCountJob, new Path(intermediatePath0));
+		FileOutputFormat.setOutputPath(decade2gramCountJob, new Path(TMP_FILE_DECADE_BIGRAM_COUNT));
+				
+		if (!isRunningInCloud) {
+			Path outputDirBigramCount = new Path(TMP_FILE_DECADE_BIGRAM_COUNT);
+			FileSystem.get(conf).delete(outputDirBigramCount, true);
+		}
+		startTime = System.currentTimeMillis();
+		status = decade2gramCountJob.waitForCompletion(true);
+		LOG.info("Decade sum counter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 		
@@ -598,7 +667,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		job2.setOutputValueClass(Text.class);
 		
 		// Read from 2 files!
-		FileInputFormat.setInputPaths(job2, new Path(intermediatePath0), new Path(intermediatePath1));
+		FileInputFormat.setInputPaths(job2, new Path(TMP_FILE_DECADE_BIGRAM_COUNT), new Path(intermediatePath1));
 		FileOutputFormat.setOutputPath(job2, new Path(intermediatePath2));
 		
 		if (!isRunningInCloud) {

@@ -38,7 +38,7 @@ public class AWSManager {
 	    AmazonElasticMapReduce mapReduce = new AmazonElasticMapReduceClient(credentials);
 	     
 	    HadoopJarStepConfig hadoopJarStep = new HadoopJarStepConfig()
-	        .withJar("s3n://mevuzarot.task2/ass2_without_delete.jar") // This should be a full map reduce application.
+	        .withJar("s3n://mevuzarot.task2/ass2.jar") // This should be a full map reduce application.
 	        .withArgs(useEnglishFile ? ENG_2GRAMS_PATH : HEB_2GRAMS_PATH,
 	        		OUTPUT_PATH,
 	        		minPmi,
