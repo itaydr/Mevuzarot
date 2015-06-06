@@ -20,6 +20,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 
 /**
  * 
@@ -38,16 +39,18 @@ public class Main {
 	private static double relMinPmi = Double.MAX_VALUE;
 	
 	private static final Logger LOG = Logger.getAnonymousLogger();
-
+	/*
 	private static final String TMP_FILE_PATH_1 = "s3n://mevuzarot.task2/intermediate/1";//"/user/hduser/ass_2_intermediate_1"// Used for the c() fumction file - first job
 	private static final String TMP_FILE_PATH_2 = "s3n://mevuzarot.task2/intermediate/2";//"/user/hduser/ass_2_intermediate_2" used for the npmi calculation file - second job
 	private static final String TMP_FILE_PATH_0 = "s3n://mevuzarot.task2/intermediate/0";//"/user/hduser/ass_2_intermediate_0"// used for the npmi calculation file - second job
 	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "s3n://mevuzarot.task2/intermediate/decade_bigram_count";//"/user/hduser/ass_2_intermediate_decade_bigram_count"// used for the npmi calculation file - second job
-	//private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1";// Used for the c() fumction file - first job
-	//private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2";// used for the npmi calculation file - second job
-	//private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0";// used for the npmi calculation file - second job
-	//private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "/user/hduser/ass_2_intermediate_decade_bigram_count";// used for the npmi calculation file - second job
-	
+	*/
+	///*
+	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1";// Used for the c() fumction file - first job
+	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2";// used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0";// used for the npmi calculation file - second job
+	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "/user/hduser/ass_2_intermediate_decade_bigram_count";// used for the npmi calculation file - second job
+	//*/
 	
 	
 	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
@@ -74,8 +77,16 @@ public class Main {
 		private final static Text DECADE = new Text();
 		private final static IntWritable COUNT = new IntWritable();
 		private final static Text ARRAY[] = new Text[3];
-
-
+		private static boolean usingEnglish;
+		private static boolean usingStopWords;
+		
+		@Override
+		public void setup(Context context) throws IOException {
+			Configuration conf = context.getConfiguration();
+			usingEnglish = conf.getBoolean("usingEnglish", true);
+			usingStopWords = conf.getBoolean("usingStopWords", false);
+		}
+		
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
@@ -93,8 +104,16 @@ public class Main {
 			//	return;
 			//}
 			
-			W1.set(arr[0]);
-			W2.set(arr[1]);
+			String w1 = arr[0];
+			String w2 = arr[1];
+			
+			if (usingStopWords && (StopWords.isStopWord(w1, usingEnglish) || StopWords.isStopWord(w2, usingEnglish))) {
+				//System.out.println("Stop words - " + w1 + " : " + w2);
+				return;
+			}
+			
+			W1.set(w1);
+			W2.set(w2);
 			DECADE.set(arr[2].substring(0, 3)); // 1998 - > 199
 			ARRAY[0] = W1;
 			ARRAY[1] = W2;
@@ -454,15 +473,15 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 			
-			System.out.println("probPair :" + probPair + ", probLeft = " + probLeft + 
-					"probRight :" + probRight + "pmi :" + pmi
-					+ "npmi :" + npmi);
+			//System.out.println("probPair :" + probPair + ", probLeft = " + probLeft + 
+			//		"probRight :" + probRight + "pmi :" + pmi
+			//		+ "npmi :" + npmi);
 			
 			
 			//System.out.println("PMI - pair - " + probPair + ", left= " + probLeft + ", " + probRight + ", totalDocs = "+ totalDocs + ", pmi = "+ pmi + ", npmi = " + npmi);
 			
 			KEY.set(keyArr[0] + S + keyArr[1]); // w1
-			VAL.set(keyArr[2] +  S + npmi);
+			VAL.set(keyArr[2] +  S + npmi + S + pmi);
 			
 			context.write(KEY, VAL);
 		}
@@ -472,8 +491,8 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 	 * 
 	 * Pmi Filter
 	 * 
-	 * Input -  w1 w2 decade pmi
-	 * Output - (decade) -> w1 w2 pmi
+	 * Input -  w1 w2 decade npmi pmi
+	 * Output - (decade) -> w1 w2 npmi pmi
 	 * 
 	 */
 	private static class PmiFilterMapper extends
@@ -490,14 +509,14 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 
 			String[] arr = value.toString().trim().split("\\s+");
 			KEY.set(arr[2]); // The decade
-			VAL.set(arr[0] + S + arr[1] + S + arr[3]);
+			VAL.set(arr[0] + S + arr[1] + S + arr[3] + S + arr[4]);
 			context.write(KEY, VAL);
 		}
 	}
 	
 	/**
-	 * Input - (decade) -> w1 w2 pmi
-	 * Output - w2 w3 pmi (only ones who passed the filter).
+	 * Input - (decade) -> w1 w2 npmi pmi
+	 * Output - decade npmi pmi w1 w2 (only ones who passed the filter).
 	 * 
 	 * @author asaf
 	 *
@@ -509,7 +528,6 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
 		private final static Set<Text> CACHE = new HashSet<Text>();
-
 		
 		
 		@Override
@@ -539,8 +557,8 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 				arr = p.toString().trim().split("\\s+");
 				double npmi = Double.parseDouble(arr[2]);
 				if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
-					KEY.set(arr[0] + S +arr[1]);
-					VAL.set(String.valueOf(npmi));
+					KEY.set(key + S + String.valueOf(npmi) + S + arr[3]); // decade npmi pmi
+					VAL.set(arr[0] + S +arr[1]); // w1 w2
 					context.write(KEY, VAL);
 				}	
 			}
@@ -577,9 +595,10 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		
 		boolean usingStopWords = args[4].equals("1");
 		boolean isRunningInCloud = args.length >= 7 && args[6].equals("1");
-		conf.setBoolean("usingStopWords", new Boolean(usingStopWords));
+		conf.setBoolean("usingStopWords", usingStopWords);
 		
 		conf.set("total_input_items_count", args[5]);
+		conf.setBoolean("usingEnglish", args[7].equals("eng"));	
 		
 		// Second job
 		Job mergeDecadesJob = Job.getInstance(conf);
@@ -688,6 +707,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		job3.setMapperClass(PmiFilterMapper.class);
 		job3.setReducerClass(PmiFilterReducer.class);
 
+		job3.setOutputFormatClass(TextOutputFormat.class);
 		job3.setMapOutputKeyClass(Text.class);
 		job3.setMapOutputValueClass(Text.class);	
 		

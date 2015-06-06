@@ -16,7 +16,8 @@ import com.amazonaws.services.elasticmapreduce.model.StepConfig;
 
 public class AWSManager {
 
-	private static final String ENG_2GRAMS_PATH = "s3n://mevuzarot.task2/eng-2gram-1m";//"";
+	private static final String ENG_2GRAMS_PATH = "s3://datasets.elasticmapreduce/ngrams/books/20090715/eng-1M/2gram/data";
+	//private static final String ENG_2GRAMS_PATH = "s3n://mevuzarot.task2/eng-2gram-1m";;
 	private static final String HEB_2GRAMS_PATH = "s3n://mevuzarot.task2/heb-2gram-10K";//"";
 	private static String ENG_BIGRAM_COUNT = "6626604215";
 	private static String HEB_BIGRAM_COUNT = "252069581";
@@ -45,7 +46,8 @@ public class AWSManager {
 	        		relMinPmi,
 	        		useStopWords,
 	        		useEnglishFile ? ENG_BIGRAM_COUNT : HEB_BIGRAM_COUNT,
-	        		"1"
+	        		"1",
+	        		useEnglishFile ? "eng" : "heb"
 	        		);
 	     
 	    StepConfig stepConfig = new StepConfig()
