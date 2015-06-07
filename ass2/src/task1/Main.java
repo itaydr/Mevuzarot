@@ -202,6 +202,8 @@ public class Main {
 	 * Input - [decade] -> w1 w2 count
 	 * Output w1 w2 decade count totalDecade
 	 * 
+	 * TODO: make sure the partitioner send both keys to the same reducer.
+	 * 
 	 * @author asaf
 	 *
 	 */
@@ -282,8 +284,15 @@ public class Main {
 			KEY.set(LEFT + S + w1 + S + decade); // l w1 decade decadeCount
 			VAL.set(w2 + S + count); // w2 count
 			context.write(KEY, VAL);
+			// Write the same live for iteration purposes.
+			KEY.set(LEFT + S + w1 + S + decade + LOWEST_ASCII);
+			context.write(KEY, VAL);
+			
 			VAL.set(w1 + S + count); // w1 count
 			KEY.set(RIGHT + S + w2 + S + decade); // r w2 decade
+			context.write(KEY, VAL);
+			//
+			KEY.set(RIGHT + S + w2 + S + decade + LOWEST_ASCII); // r w2 decade
 			context.write(KEY, VAL);
 			
 			//LOG.info("1::    " + value.toString() + "//// output - " + KEY+ " :: "  + VAL);
@@ -307,6 +316,10 @@ public class Main {
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
+			
+			System.out.println("Reducer key ->"+key+"<-");
+			if (true) return;
+			
 			int sum = 0;
 			String[] arr;
 			CACHE.clear();
@@ -668,11 +681,9 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		conf.set("relMinPmi", args[3]);
 		
 		boolean usingStopWords = args[4].equals("1");
-		boolean isRunningInCloud = args.length >= 7 && args[6].equals("1");
+		boolean isRunningInCloud = args[5].equals("1");
 		conf.setBoolean("usingStopWords", usingStopWords);
-		
-		conf.set("total_input_items_count", args[5]);
-		conf.setBoolean("usingEnglish", args[7].equals("eng"));	
+		conf.setBoolean("usingEnglish", args[6].equals("eng"));	
 		
 		// Second job
 		Job mergeDecadesJob = Job.getInstance(conf);
@@ -723,7 +734,6 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 		
-		System.exit(0);
 		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
@@ -750,6 +760,8 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		LOG.info("Apperance Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");		
+		
+		System.exit(0);
 		
 		// Second job
 		Job job2 = Job.getInstance(conf);
