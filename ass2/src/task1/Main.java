@@ -60,6 +60,7 @@ public class Main {
 	private static final String LEFT = "l";
 	private static final String RIGHT = "r";
 	private static final String S = " ";
+	private static final String LOWEST_ASCII = "	"; // TAB = 9
 	
 	/**************************
 	 * 
@@ -185,8 +186,13 @@ public class Main {
 
 			String[] arr = value.toString().trim().split("\\s+");
 			
-			KEY.set(arr[2]);
+			// First
+			KEY.set(arr[2]); // decade
 			VAL.set(arr[0] + S + arr[1] + S + arr[3]);
+			context.write(KEY, VAL);
+			
+			// Second
+			KEY.set(arr[2] + LOWEST_ASCII); // decade
 			context.write(KEY, VAL);
 		}
 	}
@@ -205,28 +211,30 @@ public class Main {
 
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
-		private final static Set<String> CACHE = new HashSet<String>();
+		private static long sum = 0;
 
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			CACHE.clear();
-			long sum = 0;
-			for (Text value : values) {
-				String valStr = value.toString();
-				String arr[] = valStr.trim().split("\\s+");
-				int count = Integer.parseInt(arr[2]);
-				sum += count;
-				
-				CACHE.add(valStr);
+			System.out.println("Reduce = key ->"+key+"<- sum = " + sum);
+			if (sum == 0) {
+				for (Text value : values) {
+					String valStr = value.toString();
+					String arr[] = valStr.trim().split("\\s+");
+					int count = Integer.parseInt(arr[2]);
+					sum += count;
+				}
 			}
-			
-			String decade = key.toString();
-			for (String value : CACHE) {
-				String arr[] = value.trim().split("\\s+");
-				KEY.set(arr[0]);
-				VAL.set(arr[1] + S + decade + S + arr[2] + S + String.valueOf(sum));
-				context.write(KEY,VAL);
+			else {
+				
+				String decade = key.toString();
+				for (Text value : values) {
+					String arr[] = value.toString().trim().split("\\s+");
+					KEY.set(arr[0]);
+					VAL.set(arr[1] + S + decade + S + arr[2] + S + String.valueOf(sum));
+					context.write(KEY,VAL);
+				}
+				sum = 0;
 			}
 		}
 	}
@@ -631,7 +639,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 	  }
 	
 	public static void main(String[] args) throws Exception {
-		
+			
 		if (args.length < 2) {
 			LOG.info("Please provide at least two arguments.");
 			System.exit(0);
@@ -714,6 +722,8 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		LOG.info("Decade sum counter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
+		
+		System.exit(0);
 		
 		Job job1 = Job.getInstance(conf);
 		job1.setJobName("AppearanceCount");
