@@ -26,6 +26,7 @@ import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
 /**
  * 
@@ -82,6 +83,7 @@ public class Main {
 		private final static Text ARRAY[] = new Text[3];
 		private static boolean usingEnglish;
 		private static boolean usingStopWords;
+		private static int count = 50;
 		
 		@Override
 		public void setup(Context context) throws IOException {
@@ -111,7 +113,6 @@ public class Main {
 			String w2 = arr[1];
 			
 			if (usingStopWords && (StopWords.isStopWord(w1, usingEnglish) || StopWords.isStopWord(w2, usingEnglish))) {
-				//System.out.println("Stop words - " + w1 + " : " + w2);
 				return;
 			}
 			
@@ -196,6 +197,29 @@ public class Main {
 			context.write(KEY, VAL);
 		}
 	}
+	
+	/**
+	 * This class makes sure that all duplicated keys will get to the same reducer.
+	 * @author asaf
+	 *
+	 */
+	private class MatchingDuplicateKeysPartitioner extends HashPartitioner<Text, Text> {
+		
+		private final Text TMP = new Text();
+		
+		@Override
+		public int getPartition(Text key, Text value, int numReduceTasks) {
+			String str = key.toString();
+			Text KEY = key;
+			if (str.substring(str.length() - 1).equals(LOWEST_ASCII)) {
+				// This is a secondary key
+				TMP.set(str.substring(0, str.length() - 1));
+				KEY = TMP;
+			}
+			
+			return super.getPartition(KEY, value, numReduceTasks);
+	    }
+	}
 
 	/**
 	 * 
@@ -218,7 +242,7 @@ public class Main {
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			System.out.println("Reduce = key ->"+key+"<- sum = " + sum);
+
 			if (sum == 0) {
 				for (Text value : values) {
 					String valStr = value.toString();
@@ -311,29 +335,27 @@ public class Main {
 			Reducer<Text, Text, Text, Text> {
 		// Reuse objects
 		private final static Text VAL = new Text();
-		private final static Set<String> CACHE = new HashSet<String>();
+		private static long sum = 0;
 
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
 			
-			System.out.println("Reducer key ->"+key+"<-");
-			if (true) return;
-			
-			int sum = 0;
 			String[] arr;
-			CACHE.clear();
-			for (Text value : values) {
-				arr = value.toString().trim().split("\\s+");
-				sum += Integer.parseInt(arr[1]);
-				CACHE.add(value.toString());
+			if (sum == 0) {
+				for (Text value : values) {
+					arr = value.toString().trim().split("\\s+");
+					sum += Integer.parseInt(arr[1]);
+				}
 			}
-			
-			for (String str : CACHE) {
-				VAL.set(str + S + sum);
-				context.write(key, VAL);
-				//System.out.println(key + " :::: " + str + " ::: " + VAL);
-			}			
+			else {	
+				for (Text value : values) {
+					VAL.set(value.toString() + S + sum);
+					context.write(key, VAL);
+				}	
+				
+				sum = 0;
+			}
 		}
 	}
 	
@@ -393,23 +415,7 @@ public class Main {
 				decadeCount = arr[4];
 				VAL.set(count + S + decadeCount);
 			}
-			
-			/**
-			 * 
-			 * PMI reducer - """ 200 shies":l 3, count = 1, self = task1.Main$PairsPMIReducer@1c92025
-PMI reducer - """ shies" 200:3, count = 1, self = task1.Main$PairsPMIReducer@1c92025
-PMI reducer - 3 200 """:r shies", count = 1, self = task1.Main$PairsPMIReducer@1c92025
 
-			 * 
-			 * PMI reducer - """ 200 shies":l 3, count = 1, self = task1.Main$PairsPMIReducer@643d12f
-PMI reducer - """ shies" 200:3, count = 1, self = task1.Main$PairsPMIReducer@643d12f
-PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@643d12f
-
-			 * 
-			 */
-			
-			//System.out.println("PMI mapper - " + KEY + ":" + VAL);
-			
 			KEY.set(w1 + S + w2 + S + decade);
 			context.write(KEY, VAL);
 		}
@@ -432,39 +438,15 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
-		private final List<Text> CACHE = new ArrayList<Text>();
 
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			
-			Text last = null;
-			CACHE.clear();
-			int i = 0;
-			for (Text value : values) {
-				//System.out.println("pmi reduce cache key = " + key + ", val = " + value);
-				last = value;
-				CACHE.add(new Text (value));
-				//System.out.println("PMI - val =" + value +", Cache - " + CACHE);
-				i++;
-			}
-			
-			// Must have 3 lines to calculate pmi
-			if (i != 3) {
-				System.out.println("PMI reducer - " + key +":"+ last + ", count = " + i + ", self = " + this);
-				for (Text value : CACHE)  {
-					context.write(key, value);
-				}
-				return;
-				//throw new IOException("Less than 3 lines in pmi reducer :" + i + ":::" + last);
-			}
-			
-			//System.out.println("PMI - Cache - " + CACHE);
-			
+
 			String keyArr[] = key.toString().trim().split("\\s+");
 			int leftSum = -1, rightSum = -1, count = -1;
 			double decadeCount = -1;
-			for (Text value : CACHE) {
+			for (Text value : values) {
 				String[] arr = value.toString().trim().split("\\s+");
 				String first = arr[0]; // this is served as the type for left/right lines.
 				
@@ -478,13 +460,10 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 					count = Integer.valueOf(arr[0]);
 					decadeCount = Integer.parseInt(arr[1]);
 				}
-				
-				//System.out.println("PMI reducer - key=" + key +": value="+ value + ", l = " + leftSum + ", r=" + rightSum +", c=" + count +  ", self = " + this);
-				
 			}
 						
 			if(leftSum == -1 || rightSum == -1 || count == -1 || decadeCount == -1 || decadeCount == 0) {
-				System.out.println("Bad seatuation ----"+ leftSum+ ":" + rightSum + ":" + decadeCount + "::::::" + key + ">>> " );
+				System.out.println("Bad situation ----("+ leftSum+ ":" + rightSum + ":" + decadeCount + ")::::::>>>>>>>" + key + "<<<<<<<<<< " );
 				return;
 			}
 
@@ -494,11 +473,14 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
-			
-			//System.out.println("probPair :" + probPair + ", probLeft = " + probLeft + 
-			//		"probRight :" + probRight + "pmi :" + pmi
-			//		+ "npmi :" + npmi);
-			
+			/*
+			System.out.println("word =" + key + " decadeCount= " + decadeCount
+					+ ", count= " + count
+					+ ", leftSum=" + leftSum + ", rightSum=" + rightSum
+					+ ", probPair :" + probPair + ", probLeft = " + probLeft + 
+					", probRight :" + probRight + ", pmi :" + pmi
+					+ ", npmi :" + npmi);
+			*/
 			
 			//System.out.println("PMI - pair - " + probPair + ", left= " + probLeft + ", " + probRight + ", totalDocs = "+ totalDocs + ", pmi = "+ pmi + ", npmi = " + npmi);
 			
@@ -533,6 +515,9 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 			KEY.set(arr[2]); // The decade
 			VAL.set(arr[0] + S + arr[1] + S + arr[3] + S + arr[4]);
 			context.write(KEY, VAL);
+			
+			KEY.set(arr[2] + LOWEST_ASCII);
+			context.write(KEY, VAL);
 		}
 	}
 	
@@ -549,40 +534,49 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		// Objects for reuse
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
-		private final static Set<Text> CACHE = new HashSet<Text>();
-		
+		private static double totalPmiInDecade = 0;
 		
 		@Override
 		public void setup(Context context) throws IOException {
 			Configuration conf = context.getConfiguration();
 			minPmi = Double.parseDouble(conf.get("minPmi"));
 			relMinPmi = Double.parseDouble(conf.get("relMinPmi"));
+			
 		}
 		
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			double totalPmiInDecade = 0;
+			
 			String[] arr = null;
-			Text pair;
-			Iterator<Text> it = values.iterator();
-			CACHE.clear();
-			while (it.hasNext()) {
-				pair = it.next();
-				arr = pair.toString().trim().split("\\s+");
-				double npmi = Double.parseDouble(arr[2]);
-				totalPmiInDecade += npmi;
-				CACHE.add(new Text(pair));
+			//System.out.println("Reducer key =" + key + "=, sum = " + totalPmiInDecade);
+			
+			if (totalPmiInDecade == 0) {
+				for (Text value : values) {
+					arr = value.toString().trim().split("\\s+");
+					double npmi = Double.parseDouble(arr[2]);
+					totalPmiInDecade += npmi;
+				}
 			}
-
-			for (Text p : CACHE) {
-				arr = p.toString().trim().split("\\s+");
-				double npmi = Double.parseDouble(arr[2]);
-				if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
-					KEY.set(key.toString()); // decade
-					VAL.set(String.valueOf(npmi) + S + arr[3] + S +arr[0] + S +arr[1]); // npmi pmi w1 w2
-					context.write(KEY, VAL);
-				}	
+			else {
+				int i = 0;
+				int j = 0;
+				for (Text value : values) {
+					arr = value.toString().trim().split("\\s+");
+					double npmi = Double.parseDouble(arr[2]);
+					if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
+						KEY.set(key.toString()); // decade
+						VAL.set(String.valueOf(npmi) + S + arr[3] + S +arr[0] + S +arr[1]); // npmi pmi w1 w2
+						context.write(KEY, VAL);
+						j++;
+					}
+					i++;
+				}
+				
+				//System.out.println("Reducer " + key + ", count= "+ i + ", filtered = "+ j
+					//	+ ", total = " + totalPmiInDecade);
+				
+				totalPmiInDecade = 0;
 			}
 		}
 	}
@@ -716,7 +710,8 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		decade2gramCountJob.setJarByClass(Main.class);
 		decade2gramCountJob.setMapperClass(DecadeBigramCountMapper.class);
 		decade2gramCountJob.setReducerClass(DecadeBigramCountReducer.class);
-
+		decade2gramCountJob.setPartitionerClass(MatchingDuplicateKeysPartitioner.class);
+		
 		// Set Output and Input Parameters
 		decade2gramCountJob.setOutputKeyClass(Text.class);
 		decade2gramCountJob.setOutputValueClass(Text.class);
@@ -735,19 +730,18 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 				+ " seconds");
 		
 		
-		Job job1 = Job.getInstance(conf);
-		job1.setJobName("AppearanceCount");
-		job1.setJarByClass(Main.class);
+		Job c1c2CounterJob = Job.getInstance(conf);
+		c1c2CounterJob.setJobName("AppearanceCount");
+		c1c2CounterJob.setJarByClass(Main.class);
 
-		FileInputFormat.setInputPaths(job1, new Path(intermediatePath0));
-		FileOutputFormat.setOutputPath(job1, new Path(intermediatePath1));
+		FileInputFormat.setInputPaths(c1c2CounterJob, new Path(intermediatePath0));
+		FileOutputFormat.setOutputPath(c1c2CounterJob, new Path(intermediatePath1));
 
-		job1.setOutputKeyClass(Text.class);
-		job1.setOutputValueClass(Text.class);
+		c1c2CounterJob.setOutputKeyClass(Text.class);
+		c1c2CounterJob.setOutputValueClass(Text.class);
 
-		job1.setMapperClass(AppearanceCountMapper.class);
-		job1.setCombinerClass(AppearanceCountReducer.class);
-		job1.setReducerClass(AppearanceCountReducer.class);
+		c1c2CounterJob.setMapperClass(AppearanceCountMapper.class);
+		c1c2CounterJob.setReducerClass(AppearanceCountReducer.class);
 
 		// Delete the output directory if it exists already.
 		if (!isRunningInCloud) {
@@ -756,26 +750,24 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		}
 
 		 startTime = System.currentTimeMillis();
-		job1.waitForCompletion(true);
+		 c1c2CounterJob.waitForCompletion(true);
 		LOG.info("Apperance Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");		
 		
-		System.exit(0);
-		
 		// Second job
-		Job job2 = Job.getInstance(conf);
-		job2.setJobName("PairsPmiCounter");
-		job2.setJarByClass(Main.class);
-		job2.setMapperClass(PairsPMIMapper.class);
-		job2.setReducerClass(PairsPMIReducer.class);
+		Job pmiCalculatorJob = Job.getInstance(conf);
+		pmiCalculatorJob.setJobName("PairsPmiCounter");
+		pmiCalculatorJob.setJarByClass(Main.class);
+		pmiCalculatorJob.setMapperClass(PairsPMIMapper.class);
+		pmiCalculatorJob.setReducerClass(PairsPMIReducer.class);
 
-		job2.setOutputKeyClass(Text.class);
-		job2.setOutputValueClass(Text.class);
+		pmiCalculatorJob.setOutputKeyClass(Text.class);
+		pmiCalculatorJob.setOutputValueClass(Text.class);
 		
 		// Read from 2 files!
-		FileInputFormat.setInputPaths(job2, new Path(TMP_FILE_DECADE_BIGRAM_COUNT), new Path(intermediatePath1));
-		FileOutputFormat.setOutputPath(job2, new Path(intermediatePath2));
+		FileInputFormat.setInputPaths(pmiCalculatorJob, new Path(TMP_FILE_DECADE_BIGRAM_COUNT), new Path(intermediatePath1));
+		FileOutputFormat.setOutputPath(pmiCalculatorJob, new Path(intermediatePath2));
 		
 		if (!isRunningInCloud) {
 			Path outputDir = new Path(intermediatePath2);
@@ -783,24 +775,25 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		}
 		
 		startTime = System.currentTimeMillis();
-		status = job2.waitForCompletion(true);
+		status = pmiCalculatorJob.waitForCompletion(true);
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 		
 		// Third job
-		Job job3 = Job.getInstance(conf);
-		job3.setJobName("Pmi Filter");
-		job3.setJarByClass(Main.class);
-		job3.setMapperClass(PmiFilterMapper.class);
-		job3.setReducerClass(PmiFilterReducer.class);
-
-		job3.setOutputFormatClass(TextOutputFormat.class);
-		job3.setMapOutputKeyClass(Text.class);
-		job3.setMapOutputValueClass(Text.class);	
+		Job pmiFilterJob = Job.getInstance(conf);
+		pmiFilterJob.setJobName("Pmi Filter");
+		pmiFilterJob.setJarByClass(Main.class);
+		pmiFilterJob.setMapperClass(PmiFilterMapper.class);
+		pmiFilterJob.setReducerClass(PmiFilterReducer.class);
+		pmiFilterJob.setPartitionerClass(MatchingDuplicateKeysPartitioner.class);
 		
-		FileInputFormat.addInputPath(job3, new Path(intermediatePath2));
-		FileOutputFormat.setOutputPath(job3, new Path(outputPath));
+		pmiFilterJob.setOutputFormatClass(TextOutputFormat.class);
+		pmiFilterJob.setMapOutputKeyClass(Text.class);
+		pmiFilterJob.setMapOutputValueClass(Text.class);	
+		
+		FileInputFormat.addInputPath(pmiFilterJob, new Path(intermediatePath2));
+		FileOutputFormat.setOutputPath(pmiFilterJob, new Path(outputPath));
 		
 		// Delete the output directory if it exists already.
 		if (!isRunningInCloud) {
@@ -809,7 +802,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		}
 
 		startTime = System.currentTimeMillis();
-		status = job3.waitForCompletion(true);
+		status = pmiFilterJob.waitForCompletion(true);
 		LOG.info("PmiFilter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
