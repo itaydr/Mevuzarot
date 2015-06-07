@@ -1,5 +1,7 @@
 package task1;
 
+import java.io.DataInput;
+import java.io.DataOutput;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,8 +14,11 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.IntWritable;
+import org.apache.hadoop.io.IntWritable.Comparator;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.io.WritableComparable;
+import org.apache.hadoop.io.WritableComparator;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
@@ -40,10 +45,10 @@ public class Main {
 	
 	private static final Logger LOG = Logger.getAnonymousLogger();
 	/*
-	private static final String TMP_FILE_PATH_1 = "s3n://mevuzarot.task2/intermediate/1";//"/user/hduser/ass_2_intermediate_1"// Used for the c() fumction file - first job
-	private static final String TMP_FILE_PATH_2 = "s3n://mevuzarot.task2/intermediate/2";//"/user/hduser/ass_2_intermediate_2" used for the npmi calculation file - second job
-	private static final String TMP_FILE_PATH_0 = "s3n://mevuzarot.task2/intermediate/0";//"/user/hduser/ass_2_intermediate_0"// used for the npmi calculation file - second job
-	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "s3n://mevuzarot.task2/intermediate/decade_bigram_count";//"/user/hduser/ass_2_intermediate_decade_bigram_count"// used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_1 = "s3n://mevuzarot.task2/intermediate/11";//"/user/hduser/ass_2_intermediate_1"// Used for the c() fumction file - first job
+	private static final String TMP_FILE_PATH_2 = "s3n://mevuzarot.task2/intermediate/22";//"/user/hduser/ass_2_intermediate_2" used for the npmi calculation file - second job
+	private static final String TMP_FILE_PATH_0 = "s3n://mevuzarot.task2/intermediate/00";//"/user/hduser/ass_2_intermediate_0"// used for the npmi calculation file - second job
+	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "s3n://mevuzarot.task2/intermediate/decade_bigram_count0";//"/user/hduser/ass_2_intermediate_decade_bigram_count"// used for the npmi calculation file - second job
 	*/
 	///*
 	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1";// Used for the c() fumction file - first job
@@ -52,9 +57,6 @@ public class Main {
 	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "/user/hduser/ass_2_intermediate_decade_bigram_count";// used for the npmi calculation file - second job
 	//*/
 	
-	
-	private static final String HDFS_FIRST_SPLIT_SUFFIX = "/part-r-00000";
-
 	private static final String LEFT = "l";
 	private static final String RIGHT = "r";
 	private static final String S = " ";
@@ -208,7 +210,6 @@ public class Main {
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
-			
 			CACHE.clear();
 			long sum = 0;
 			for (Text value : values) {
@@ -557,13 +558,78 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 				arr = p.toString().trim().split("\\s+");
 				double npmi = Double.parseDouble(arr[2]);
 				if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
-					KEY.set(key + S + String.valueOf(npmi) + S + arr[3]); // decade npmi pmi
-					VAL.set(arr[0] + S +arr[1]); // w1 w2
+					KEY.set(key.toString()); // decade
+					VAL.set(String.valueOf(npmi) + S + arr[3] + S +arr[0] + S +arr[1]); // npmi pmi w1 w2
 					context.write(KEY, VAL);
 				}	
 			}
 		}
 	}
+	/**
+	 * Filters text of format <decade pmi>
+	 * @author asaf
+	 *
+	 */
+	public static class FilterComparable extends WritableComparator {
+	    
+		private final static Text T = new Text();
+		private final static Text T2 = new Text();
+		@Override
+	    public int compare(WritableComparable o,WritableComparable o2){
+	        System.out.println("in compare");
+	        Text t = (Text)o;
+	        Text t2 = (Text)o2;
+	        
+	        String arr1[] = t.toString().trim().split("\\s+");
+	        String arr2[] = t.toString().trim().split("\\s+");
+	        
+	        if (arr1.length != 2 || arr2.length != 2) {
+	        	System.out.println("Ban lenghts in compare "+ t + S + t2);
+	        	return t.compareTo(t2);
+	        }
+	        
+	        T.set(arr1[0]);
+	        T2.set(arr2[0]);
+	        
+	        // Reverse order.
+	        int res = T2.compareTo(T);
+	        if (res != 0) {
+	        	return res;
+	        }
+	        else {
+	        	T.set(arr1[1]);
+	        	T2.set(arr2[1]);
+	        	return T2.compareTo(T);
+	        }
+	    }
+	}
+	
+	 /** A WritableComparator optimized for Text keys. */
+	  public static class Comparator extends WritableComparator {
+	    public Comparator() {
+	      super(Text.class);
+	    }
+	    
+	    
+	    @Override
+		public int compare(WritableComparable a, WritableComparable b) {
+			// TODO Auto-generated method stub
+	    	System.out.println("Inside "+ a +S+b);
+			return super.compare(a, b);
+		}
+
+
+
+		public int compare(byte[] b1, int s1, int l1,
+	                       byte[] b2, int s2, int l2) {
+	      
+	    
+		  int n1 = 1;//WritableUtils.decodeVIntSize(b1[s1]);
+	      int n2 = 2;//WritableUtils.decodeVIntSize(b2[s2]);
+	      return compareBytes(b1, s1+n1, l1-n1, b2, s2+n2, l2-n2);
+	    }
+	  }
+	
 	public static void main(String[] args) throws Exception {
 		
 		if (args.length < 2) {
@@ -607,7 +673,7 @@ PMI reducer - shies" 200 """:r 3, count = 1, self = task1.Main$PairsPMIReducer@6
 		mergeDecadesJob.setMapperClass(DecadeMergeMapper.class);
 		mergeDecadesJob.setReducerClass(DecadeMergeReducer.class);
 
-		mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
+		//mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
 		// Set Output and Input Parameters
 		mergeDecadesJob.setOutputKeyClass(Text.class);
 		mergeDecadesJob.setOutputValueClass(IntWritable.class);

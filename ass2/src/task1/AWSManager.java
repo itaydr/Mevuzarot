@@ -39,7 +39,7 @@ public class AWSManager {
 	    AmazonElasticMapReduce mapReduce = new AmazonElasticMapReduceClient(credentials);
 	     
 	    HadoopJarStepConfig hadoopJarStep = new HadoopJarStepConfig()
-	        .withJar("s3n://mevuzarot.task2/ass2.jar") // This should be a full map reduce application.
+	        .withJar("s3n://mevuzarot.task2/ass22.jar") // This should be a full map reduce application.
 	        .withArgs(useEnglishFile ? ENG_2GRAMS_PATH : HEB_2GRAMS_PATH,
 	        		OUTPUT_PATH,
 	        		minPmi,
@@ -56,10 +56,10 @@ public class AWSManager {
 	        .withActionOnFailure("TERMINATE_JOB_FLOW");
 	     
 	    JobFlowInstancesConfig instances = new JobFlowInstancesConfig()
-	        .withInstanceCount(6)
+	        .withInstanceCount(15)
 	        .withMasterInstanceType(InstanceType.M1Medium.toString())
 	        .withSlaveInstanceType(InstanceType.M1Medium.toString())
-	        .withHadoopVersion("2.2.0")
+	        .withHadoopVersion("2.4.0")
 	        //.withEc2KeyName(Credentials.KEY_PAIR)
 	        .withKeepJobFlowAliveWhenNoSteps(false)
 	        //.withPlacement(new PlacementType("us-east-1a"))
