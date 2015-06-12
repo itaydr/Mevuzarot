@@ -19,9 +19,7 @@ public class AWSManager {
 	private static final String ENG_2GRAMS_PATH = "s3://datasets.elasticmapreduce/ngrams/books/20090715/eng-1M/2gram/data";
 	//private static final String ENG_2GRAMS_PATH = "s3n://mevuzarot.task2/eng-2gram-1m";;
 	private static final String HEB_2GRAMS_PATH = "s3n://mevuzarot.task2/heb-2gram-10K";//"";
-	private static String ENG_BIGRAM_COUNT = "6626604215";
-	private static String HEB_BIGRAM_COUNT = "252069581";
-	private static final String OUTPUT_PATH  = "s3n://mevuzarot.task2/output/";
+	private static final String OUTPUT_PATH  = "s3n://mevuzarot.task2/output-small/";
 	
 	public static void main(String[] args) throws Exception {
 		
@@ -39,13 +37,13 @@ public class AWSManager {
 	    AmazonElasticMapReduce mapReduce = new AmazonElasticMapReduceClient(credentials);
 	     
 	    HadoopJarStepConfig hadoopJarStep = new HadoopJarStepConfig()
-	        .withJar("s3n://mevuzarot.task2/ass22.jar") // This should be a full map reduce application.
-	        .withArgs(useEnglishFile ? ENG_2GRAMS_PATH : HEB_2GRAMS_PATH,
+	        .withJar("s3n://mevuzarot.task2/ass2.jar") // This should be a full map reduce application.
+	        .withArgs(
+	        		useEnglishFile ? ENG_2GRAMS_PATH : HEB_2GRAMS_PATH,
 	        		OUTPUT_PATH,
 	        		minPmi,
 	        		relMinPmi,
 	        		useStopWords,
-	        		useEnglishFile ? ENG_BIGRAM_COUNT : HEB_BIGRAM_COUNT,
 	        		"1",
 	        		useEnglishFile ? "eng" : "heb"
 	        		);
@@ -56,7 +54,7 @@ public class AWSManager {
 	        .withActionOnFailure("TERMINATE_JOB_FLOW");
 	     
 	    JobFlowInstancesConfig instances = new JobFlowInstancesConfig()
-	        .withInstanceCount(15)
+	        .withInstanceCount(6)
 	        .withMasterInstanceType(InstanceType.M1Medium.toString())
 	        .withSlaveInstanceType(InstanceType.M1Medium.toString())
 	        .withHadoopVersion("2.4.0")

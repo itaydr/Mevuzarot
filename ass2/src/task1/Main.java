@@ -13,8 +13,8 @@ import java.util.logging.Logger;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.IntWritable;
-import org.apache.hadoop.io.IntWritable.Comparator;
+import org.apache.hadoop.io.DoubleWritable;
+import org.apache.hadoop.io.DoubleWritable.Comparator;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.io.WritableComparable;
@@ -45,18 +45,18 @@ public class Main {
 	private static double relMinPmi = Double.MAX_VALUE;
 	
 	private static final Logger LOG = Logger.getAnonymousLogger();
-	/*
+	///*
 	private static final String TMP_FILE_PATH_1 = "s3n://mevuzarot.task2/intermediate/11";//"/user/hduser/ass_2_intermediate_1"// Used for the c() fumction file - first job
 	private static final String TMP_FILE_PATH_2 = "s3n://mevuzarot.task2/intermediate/22";//"/user/hduser/ass_2_intermediate_2" used for the npmi calculation file - second job
 	private static final String TMP_FILE_PATH_0 = "s3n://mevuzarot.task2/intermediate/00";//"/user/hduser/ass_2_intermediate_0"// used for the npmi calculation file - second job
 	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "s3n://mevuzarot.task2/intermediate/decade_bigram_count0";//"/user/hduser/ass_2_intermediate_decade_bigram_count"// used for the npmi calculation file - second job
-	*/
-	///*
+	//*/
+	/*
 	private static final String TMP_FILE_PATH_1 = "/user/hduser/ass_2_intermediate_1";// Used for the c() fumction file - first job
 	private static final String TMP_FILE_PATH_2 = "/user/hduser/ass_2_intermediate_2";// used for the npmi calculation file - second job
 	private static final String TMP_FILE_PATH_0 = "/user/hduser/ass_2_intermediate_0";// used for the npmi calculation file - second job
 	private static final String TMP_FILE_DECADE_BIGRAM_COUNT = "/user/hduser/ass_2_intermediate_decade_bigram_count";// used for the npmi calculation file - second job
-	//*/
+	*/
 	
 	private static final String LEFT = "l";
 	private static final String RIGHT = "r";
@@ -71,7 +71,7 @@ public class Main {
 	 * output - [w1 w2 decade] -> count
 	 */
 	private static class DecadeMergeMapper extends
-			Mapper<LongWritable, Text, Text, IntWritable> {
+			Mapper<LongWritable, Text, Text, DoubleWritable> {
 
 		// Objects for reuse
 		private final static TextArrayWritable KEY = new TextArrayWritable();
@@ -79,7 +79,7 @@ public class Main {
 		private final static Text W1 = new Text();
 		private final static Text W2 = new Text();
 		private final static Text DECADE = new Text();
-		private final static IntWritable COUNT = new IntWritable();
+		private final static DoubleWritable COUNT = new DoubleWritable();
 		private final static Text ARRAY[] = new Text[3];
 		private static boolean usingEnglish;
 		private static boolean usingStopWords;
@@ -97,7 +97,9 @@ public class Main {
 				throws IOException, InterruptedException {
 
 			String[] arr = value.toString().trim().split("\\s+");
+			
 			if (!AppearanceCountMapper.validateInput2gram(arr)) {
+				//System.out.println("Not 2gram = " + value);
 				return;
 			}
 			
@@ -124,7 +126,16 @@ public class Main {
 			ARRAY[2] = DECADE;
 			
 			KEY.set(ARRAY); 
-			COUNT.set(Integer.parseInt(arr[3]));
+			double count = 0;
+			try {
+				count = Double.parseDouble(arr[3]);
+			}
+			catch (Exception e) {
+				System.out.println("Failed parsing the number=" + ", the full line was= ");
+				return;
+			}
+			
+			COUNT.set(count);
 			TextKey.set(KEY.toString());
 			context.write(TextKey, COUNT);
 			
@@ -147,17 +158,17 @@ public class Main {
 	 *
 	 */
 	private static class DecadeMergeReducer extends
-			Reducer<Text, IntWritable, Text, Text> {
+			Reducer<Text, DoubleWritable, Text, Text> {
 		// Reuse objects
 
 		private final static Text VAL = new Text();
 
 		@Override
-		public void reduce(Text key, Iterable<IntWritable> values,
+		public void reduce(Text key, Iterable<DoubleWritable> values,
 				Context context) throws IOException, InterruptedException {
 			
 			long sum = 0;
-			for (IntWritable i : values) {
+			for (DoubleWritable i : values) {
 				sum += i.get();
 			}
 			
@@ -203,9 +214,9 @@ public class Main {
 	 * @author asaf
 	 *
 	 */
-	private class MatchingDuplicateKeysPartitioner extends HashPartitioner<Text, Text> {
+	private static class MatchingDuplicateKeysPartitioner extends HashPartitioner<Text, Text> {
 		
-		private final Text TMP = new Text();
+		private static final Text TMP = new Text();
 		
 		@Override
 		public int getPartition(Text key, Text value, int numReduceTasks) {
@@ -247,8 +258,8 @@ public class Main {
 				for (Text value : values) {
 					String valStr = value.toString();
 					String arr[] = valStr.trim().split("\\s+");
-					int count = Integer.parseInt(arr[2]);
-					sum += count;
+					double count = Double.parseDouble(arr[2]);
+					sum += 2 * count; // 2 because each term has 2 words.
 				}
 			}
 			else {
@@ -281,6 +292,13 @@ public class Main {
 		private final static Text VAL = new Text();
 				
 		private static boolean validateInput2gram(String[] lineArray) {
+			
+			if (lineArray == null)
+				return false;
+			
+			int l = lineArray.length;			
+			boolean is = l >= 4;
+	
 			 if(lineArray.length >= 4 && lineArray[2].length() >= 4) {
 				 return true;
 			 }
@@ -300,6 +318,12 @@ public class Main {
 			 
 			 
 			String[] arr = value.toString().trim().split("\\s+");
+			
+			if (arr.length < 4) {
+				System.out.println("Array is less then 4 size - " + key + ", " + value);
+				return;
+			}
+ 			
 			String w1 = arr[0];
 			String w2 = arr[1];
 			String decade = arr[2];
@@ -335,7 +359,7 @@ public class Main {
 			Reducer<Text, Text, Text, Text> {
 		// Reuse objects
 		private final static Text VAL = new Text();
-		private static long sum = 0;
+		private static double sum = 0;
 
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
@@ -345,7 +369,13 @@ public class Main {
 			if (sum == 0) {
 				for (Text value : values) {
 					arr = value.toString().trim().split("\\s+");
-					sum += Integer.parseInt(arr[1]);
+					
+					if (arr.length < 2) {
+						System.out.println("Bad length Apperance reducer - " + key + ", " + value);
+						continue;
+					}
+					
+					sum += Double.parseDouble(arr[1]);
 				}
 			}
 			else {	
@@ -391,6 +421,12 @@ public class Main {
 			// TODO: check if has 3 slots.
 			if (first.equals(LEFT)) {
 				//left w1 w2 decade count sum
+				
+				if (arr.length < 6) {
+					System.out.println("Bad length left " + key + ", " + value);
+					return;
+				}
+				
 				w1 = arr[1];
 				w2 = arr[3];
 				decade = arr[2];
@@ -398,15 +434,26 @@ public class Main {
 				VAL.set(LEFT + S + count);
 			}
 			else if (first.equals(RIGHT)) {
+				if (arr.length < 6) {
+					System.out.println("Bad length right " + key + ", " + value);
+					return;
+				}
+				
 				// right w1 w2 decade count sum
 				w1 = arr[3];
 				w2 = arr[1];
 				decade = arr[2];
 				count = arr[5];
-				decadeCount = arr[5];
+				decadeCount = arr[5];// is this ok?
 				VAL.set(RIGHT + S + count);
 			}
 			else {
+				
+				if (arr.length < 5) {
+					System.out.println("Bad length else " + key + ", " + value);
+					return;
+				}
+				
 				// 2-gram
 				w1 = arr[0];
 				w2 = arr[1];
@@ -444,21 +491,27 @@ public class Main {
 				Context context) throws IOException, InterruptedException {
 
 			String keyArr[] = key.toString().trim().split("\\s+");
-			int leftSum = -1, rightSum = -1, count = -1;
+			double leftSum = -1, rightSum = -1, count = -1;
 			double decadeCount = -1;
 			for (Text value : values) {
 				String[] arr = value.toString().trim().split("\\s+");
+				
+				if (arr.length < 2) {
+					System.out.println("Bad length PairsPMIReducer " + key + ", " + value);
+					return;
+				}
+				
 				String first = arr[0]; // this is served as the type for left/right lines.
 				
 				if (first.equals(LEFT)) {
-					leftSum = Integer.valueOf(arr[1]);
+					leftSum = Double.parseDouble(arr[1]);
 				}
 				else if (first.equals(RIGHT)) {
-					rightSum = Integer.valueOf(arr[1]);
+					rightSum = Double.parseDouble(arr[1]);
 				}
 				else {
-					count = Integer.valueOf(arr[0]);
-					decadeCount = Integer.parseInt(arr[1]);
+					count = Double.parseDouble(arr[0]);
+					decadeCount = Double.parseDouble(arr[1]);
 				}
 			}
 						
@@ -473,6 +526,7 @@ public class Main {
 
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
+			
 			/*
 			System.out.println("word =" + key + " decadeCount= " + decadeCount
 					+ ", count= " + count
@@ -512,6 +566,12 @@ public class Main {
 				throws IOException, InterruptedException {
 
 			String[] arr = value.toString().trim().split("\\s+");
+			
+			if (arr.length < 5) {
+				System.out.println("Bad length PmiFilterMapper " + key + ", " + value);
+				return;
+			}
+			
 			KEY.set(arr[2]); // The decade
 			VAL.set(arr[0] + S + arr[1] + S + arr[3] + S + arr[4]);
 			context.write(KEY, VAL);
@@ -554,23 +614,32 @@ public class Main {
 			if (totalPmiInDecade == 0) {
 				for (Text value : values) {
 					arr = value.toString().trim().split("\\s+");
+					
+					if (arr.length < 3) {
+						System.out.println("Bad length PmiFilterReducer " + key + ", " + value);
+						return;
+					}
+					
 					double npmi = Double.parseDouble(arr[2]);
 					totalPmiInDecade += npmi;
 				}
 			}
 			else {
-				int i = 0;
-				int j = 0;
 				for (Text value : values) {
 					arr = value.toString().trim().split("\\s+");
+					if (arr.length < 4) {
+						System.out.println("Bad length PmiFilterReducer 2 " + key + ", " + value);
+						return;
+					}
+					
+					
 					double npmi = Double.parseDouble(arr[2]);
 					if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
 						KEY.set(key.toString()); // decade
 						VAL.set(String.valueOf(npmi) + S + arr[3] + S +arr[0] + S +arr[1]); // npmi pmi w1 w2
 						context.write(KEY, VAL);
-						j++;
 					}
-					i++;
+					
 				}
 				
 				//System.out.println("Reducer " + key + ", count= "+ i + ", filtered = "+ j
@@ -686,10 +755,10 @@ public class Main {
 		mergeDecadesJob.setMapperClass(DecadeMergeMapper.class);
 		mergeDecadesJob.setReducerClass(DecadeMergeReducer.class);
 
-		//mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
+		mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
 		// Set Output and Input Parameters
 		mergeDecadesJob.setOutputKeyClass(Text.class);
-		mergeDecadesJob.setOutputValueClass(IntWritable.class);
+		mergeDecadesJob.setOutputValueClass(DoubleWritable.class);
 		
 		FileInputFormat.addInputPath(mergeDecadesJob, new Path(args[0]));
 		FileOutputFormat.setOutputPath(mergeDecadesJob, new Path(intermediatePath0));
@@ -779,6 +848,7 @@ public class Main {
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
+		
 		
 		// Third job
 		Job pmiFilterJob = Job.getInstance(conf);
