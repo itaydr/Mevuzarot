@@ -2,6 +2,7 @@ package task1;
 
 import java.io.DataInput;
 import java.io.DataOutput;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -27,17 +28,6 @@ import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
 import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
-
-/**
- * 
- * Need to calculate the N for each decade. totalDocs will not do it!
- * 
- * 
- * 
- * @author asaf
- *
- */
-
 
 public class Main {
 
@@ -686,19 +676,19 @@ public class Main {
 							VAL.set("Total in decade was " + totalPmiInDecade);
 							context.write(KEY, VAL);
 							
-							KEY.set("\tW1\tW2\tnpmi\tpmi");
+							KEY.set("\t\tW1\t\tW2\t\tnpmi\t\tpmi");
 							VAL.set("");
 							context.write(KEY, VAL);
 						}
 						
-						KEY.set("\t" + arr[0] + "\t" + arr[1] + "\t" +npmi + "\t" +  arr[2]);
+						KEY.set("\t\t" + arr[0] + "\t\t" + arr[1] + "\t\t" +npmi + "\t\t" +  arr[2]);
 						VAL.set("");
 						//KEY.set(String.valueOf(npmi)); // npmi
 						//VAL.set("\t\t" + arr[2] + S +arr[0] + S +arr[1]); // pmi w1 w2
 						context.write(KEY, VAL);
 					}
 					else {
-						LOG.info("PmiFilterReducer failed =" + key + "=, sum = " + totalPmiInDecade + ", npmi = " + npmi);
+						//LOG.info("PmiFilterReducer failed =" + key + "=, sum = " + totalPmiInDecade + ", npmi = " + npmi);
 					}
 					
 				}
@@ -752,10 +742,6 @@ public class Main {
 		}
 		
 		String inputPath = args[0];
-
-		// TODO This output path is for the 2nd job's.
-		// The fits job will have an intermediate output path from which the
-		// second job's reducer will read
 		String outputPath = args[1];
 		String intermediatePath1 = TMP_FILE_PATH_1;
 		String intermediatePath2 = TMP_FILE_PATH_2;
@@ -763,7 +749,11 @@ public class Main {
 
 		LOG.info("Tool: Appearances Part");
 		LOG.info(" - input path: " + inputPath);
-		LOG.info(" - output path: " + intermediatePath1);
+		LOG.info(" - output path: " + outputPath);
+		LOG.info(" - Inter path 0: " + intermediatePath0);
+		LOG.info(" - Inter path 1: " + intermediatePath1);
+		LOG.info(" - Inter path 2: " + intermediatePath2);
+		LOG.info(" - Decade bigram path: " + decadeBigramCountPath);
 		
 		Configuration conf = new Configuration();
 		conf.set("intermediatePath1", intermediatePath1);
@@ -780,7 +770,7 @@ public class Main {
 		
 		long startTime;
 		boolean status;
-		/*
+		
 		// Second job
 		Job mergeDecadesJob = Job.getInstance(conf);
 		mergeDecadesJob.setJobName("DecadeMergeCounter");
@@ -788,7 +778,7 @@ public class Main {
 		mergeDecadesJob.setMapperClass(DecadeMergeMapper.class);
 		mergeDecadesJob.setReducerClass(DecadeMergeReducer.class);
 
-		//mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
+		mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
 		// Set Output and Input Parameters
 		mergeDecadesJob.setOutputKeyClass(Text.class);
 		mergeDecadesJob.setOutputValueClass(DoubleWritable.class);
@@ -800,8 +790,8 @@ public class Main {
 			Path outputDir0 = new Path(intermediatePath0);
 			FileSystem.get(conf).delete(outputDir0, true);
 		}
-		long startTime = System.currentTimeMillis();
-		boolean status = mergeDecadesJob.waitForCompletion(true);
+		startTime = System.currentTimeMillis();
+		status = mergeDecadesJob.waitForCompletion(true);
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
@@ -881,7 +871,6 @@ public class Main {
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
-		*/
 		
 		// Third job
 		Job pmiFilterJob = Job.getInstance(conf);

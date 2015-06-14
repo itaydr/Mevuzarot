@@ -34,6 +34,7 @@ public class StopWords {
 	private final static String[] eng_words = {
 	
 // My
+"?",
 "!",
 "@",
 "#",
