@@ -115,12 +115,19 @@ public class Main {
 			String w2 = arr[1];
 			
 			if (usingStopWords && (StopWords.isStopWord(w1, usingEnglish) || StopWords.isStopWord(w2, usingEnglish))) {
+				//System.out.println("Stopped word! = " + value);
 				return;
 			}
 			
 			W1.set(w1);
 			W2.set(w2);
-			DECADE.set(arr[2].substring(0, 3)); // 1998 - > 199
+			String decade = arr[2].substring(0, 3);
+			
+			
+			//if (decade.charAt(0) != '1' && decade.charAt(0) != '2') 
+				//return;
+			
+			DECADE.set(decade); // 1998 - > 199
 			ARRAY[0] = W1;
 			ARRAY[1] = W2;
 			ARRAY[2] = DECADE;
@@ -299,7 +306,7 @@ public class Main {
 			int l = lineArray.length;			
 			boolean is = l >= 4;
 	
-			 if(lineArray.length >= 4 && lineArray[2].length() >= 4) {
+			 if(lineArray.length == 6 && lineArray[2].length() >= 4) {
 				 return true;
 			 }
 			 else {
@@ -550,16 +557,16 @@ public class Main {
 	 * Pmi Filter
 	 * 
 	 * Input -  w1 w2 decade npmi pmi
-	 * Output - (decade) -> w1 w2 npmi pmi
+	 * Output - (decade npmi) -> w1 w2 pmi
 	 * 
 	 */
 	private static class PmiFilterMapper extends
-			Mapper<LongWritable, Text, Text, Text> {
+			Mapper<LongWritable, Text, FinalOutputWritable, Text> {
 
 		// Objects for reuse
-		private final static Text KEY = new Text();
+		private final static FinalOutputWritable KEY = new FinalOutputWritable();
 		private final static Text VAL = new Text();
-
+		//private static int count = 50;
 		
 		@Override
 		public void map(LongWritable key, Text value, Context context)
@@ -572,29 +579,59 @@ public class Main {
 				return;
 			}
 			
-			KEY.set(arr[2]); // The decade
-			VAL.set(arr[0] + S + arr[1] + S + arr[3] + S + arr[4]);
+			//if (count == 0) {
+			//	return;
+				
+			//}
+			//else {
+			//	count--;
+			//}
+			
+			KEY.decade = Integer.parseInt(arr[2]);
+			KEY.npmi = Double.parseDouble(arr[3]);
+			KEY.isSecondary = true;
+			//KEY.set(arr[2] + S + arr[3]); // decade  npmi
+			VAL.set(arr[0] + S + arr[1] + S + arr[4]); // w1 w2 pmi
 			context.write(KEY, VAL);
 			
-			KEY.set(arr[2] + LOWEST_ASCII);
+			KEY.isSecondary = false;
 			context.write(KEY, VAL);
 		}
 	}
 	
 	/**
-	 * Input - (decade) -> w1 w2 npmi pmi
-	 * Output - decade npmi pmi w1 w2 (only ones who passed the filter).
+	 * This class makes sure that all duplicated keys will get to the same reducer.
+	 * @author asaf
+	 *
+	 */
+	private static class PmiFilterPartitioner extends HashPartitioner<FinalOutputWritable, Text> {
+		
+		private static final Text TMP = new Text();
+		private static final HashPartitioner<Text, Text> patitioner = new HashPartitioner<Text, Text>();
+		
+		@Override
+		public int getPartition(FinalOutputWritable key, Text value, int numReduceTasks) {
+			TMP.set(String.valueOf(key.decade));
+			return PmiFilterPartitioner.patitioner.getPartition(TMP, value, numReduceTasks);
+	    }
+	}
+	
+	/**
+	 * Input - (decade npmi) -> w1 w2 pmi
+	 * Output - (decade npmi) -> pmi w1 w2 (only ones who passed the filter).
 	 * 
 	 * @author asaf
 	 *
 	 */
 	private static class PmiFilterReducer extends
-			Reducer<Text, Text, Text, Text> {
-		// Reuse objects
-		// Objects for reuse
+			Reducer<FinalOutputWritable, Text, Text, Text> {
+
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
 		private static double totalPmiInDecade = 0;
+		private static int lastDecade1 = 0;
+		private static int lastDecade = 0;
+		
 		
 		@Override
 		public void setup(Context context) throws IOException {
@@ -605,47 +642,66 @@ public class Main {
 		}
 		
 		@Override
-		public void reduce(Text key, Iterable<Text> values,
+		public void reduce(FinalOutputWritable key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
 			
 			String[] arr = null;
 			//System.out.println("Reducer key =" + key + "=, sum = " + totalPmiInDecade);
+		
+			//LOG.info("PmiFilterReducer key =>" + key + "<= isSec = " + (key.isSecondary ? "YES" : "NO") + ", sum = " + totalPmiInDecade +" minPmi " + minPmi + ", rel " + relMinPmi);
 			
-			if (totalPmiInDecade == 0) {
+			if (lastDecade != key.decade)  {
+				totalPmiInDecade = 0;
+			}
+			
+			lastDecade = key.decade;
+			
+			if (key.isSecondary) {
 				for (Text value : values) {
-					arr = value.toString().trim().split("\\s+");
+					//arr = value.toString().trim().split("\\s+");
 					
-					if (arr.length < 3) {
-						System.out.println("Bad length PmiFilterReducer " + key + ", " + value);
-						return;
-					}
+					//if (arr.length < 3) {
+					//	System.out.println("Bad length PmiFilterReducer " + key + ", " + value);
+					//	return;
+					//}
 					
-					double npmi = Double.parseDouble(arr[2]);
+					double npmi = key.npmi;
 					totalPmiInDecade += npmi;
 				}
 			}
 			else {
 				for (Text value : values) {
 					arr = value.toString().trim().split("\\s+");
-					if (arr.length < 4) {
-						System.out.println("Bad length PmiFilterReducer 2 " + key + ", " + value);
-						return;
-					}
+					//if (arr.length < 4) {
+					//	System.out.println("Bad length PmiFilterReducer 2 " + key + ", " + value);
+					//	return;
+					//}
 					
-					
-					double npmi = Double.parseDouble(arr[2]);
+					double npmi = key.npmi;
 					if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
-						KEY.set(key.toString()); // decade
-						VAL.set(String.valueOf(npmi) + S + arr[3] + S +arr[0] + S +arr[1]); // npmi pmi w1 w2
+						
+						if (lastDecade1 != key.decade) {
+						    lastDecade1 = key.decade;
+							KEY.set("\nDecade " + String.valueOf(key.decade) + "0");
+							VAL.set("Total in decade was " + totalPmiInDecade);
+							context.write(KEY, VAL);
+							
+							KEY.set("\tW1\tW2\tnpmi\tpmi");
+							VAL.set("");
+							context.write(KEY, VAL);
+						}
+						
+						KEY.set("\t" + arr[0] + "\t" + arr[1] + "\t" +npmi + "\t" +  arr[2]);
+						VAL.set("");
+						//KEY.set(String.valueOf(npmi)); // npmi
+						//VAL.set("\t\t" + arr[2] + S +arr[0] + S +arr[1]); // pmi w1 w2
 						context.write(KEY, VAL);
+					}
+					else {
+						LOG.info("PmiFilterReducer failed =" + key + "=, sum = " + totalPmiInDecade + ", npmi = " + npmi);
 					}
 					
 				}
-				
-				//System.out.println("Reducer " + key + ", count= "+ i + ", filtered = "+ j
-					//	+ ", total = " + totalPmiInDecade);
-				
-				totalPmiInDecade = 0;
 			}
 		}
 	}
@@ -688,32 +744,6 @@ public class Main {
 	    }
 	}
 	
-	 /** A WritableComparator optimized for Text keys. */
-	  public static class Comparator extends WritableComparator {
-	    public Comparator() {
-	      super(Text.class);
-	    }
-	    
-	    
-	    @Override
-		public int compare(WritableComparable a, WritableComparable b) {
-			// TODO Auto-generated method stub
-	    	System.out.println("Inside "+ a +S+b);
-			return super.compare(a, b);
-		}
-
-
-
-		public int compare(byte[] b1, int s1, int l1,
-	                       byte[] b2, int s2, int l2) {
-	      
-	    
-		  int n1 = 1;//WritableUtils.decodeVIntSize(b1[s1]);
-	      int n2 = 2;//WritableUtils.decodeVIntSize(b2[s2]);
-	      return compareBytes(b1, s1+n1, l1-n1, b2, s2+n2, l2-n2);
-	    }
-	  }
-	
 	public static void main(String[] args) throws Exception {
 			
 		if (args.length < 2) {
@@ -748,6 +778,9 @@ public class Main {
 		conf.setBoolean("usingStopWords", usingStopWords);
 		conf.setBoolean("usingEnglish", args[6].equals("eng"));	
 		
+		long startTime;
+		boolean status;
+		/*
 		// Second job
 		Job mergeDecadesJob = Job.getInstance(conf);
 		mergeDecadesJob.setJobName("DecadeMergeCounter");
@@ -755,7 +788,7 @@ public class Main {
 		mergeDecadesJob.setMapperClass(DecadeMergeMapper.class);
 		mergeDecadesJob.setReducerClass(DecadeMergeReducer.class);
 
-		mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
+		//mergeDecadesJob.setInputFormatClass(SequenceFileInputFormat.class);
 		// Set Output and Input Parameters
 		mergeDecadesJob.setOutputKeyClass(Text.class);
 		mergeDecadesJob.setOutputValueClass(DoubleWritable.class);
@@ -848,7 +881,7 @@ public class Main {
 		LOG.info("PairsPmiCounter Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
-		
+		*/
 		
 		// Third job
 		Job pmiFilterJob = Job.getInstance(conf);
@@ -856,11 +889,14 @@ public class Main {
 		pmiFilterJob.setJarByClass(Main.class);
 		pmiFilterJob.setMapperClass(PmiFilterMapper.class);
 		pmiFilterJob.setReducerClass(PmiFilterReducer.class);
-		pmiFilterJob.setPartitionerClass(MatchingDuplicateKeysPartitioner.class);
+		pmiFilterJob.setPartitionerClass(PmiFilterPartitioner.class);
+		//pmiFilterJob.setSortComparatorClass(FilterComparable.class);
 		
 		pmiFilterJob.setOutputFormatClass(TextOutputFormat.class);
-		pmiFilterJob.setMapOutputKeyClass(Text.class);
-		pmiFilterJob.setMapOutputValueClass(Text.class);	
+		pmiFilterJob.setMapOutputKeyClass(FinalOutputWritable.class);
+		pmiFilterJob.setMapOutputValueClass(Text.class);
+		pmiFilterJob.setOutputKeyClass(DoubleWritable.class);
+		pmiFilterJob.setOutputValueClass(Text.class);
 		
 		FileInputFormat.addInputPath(pmiFilterJob, new Path(intermediatePath2));
 		FileOutputFormat.setOutputPath(pmiFilterJob, new Path(outputPath));
