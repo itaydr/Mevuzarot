@@ -753,7 +753,6 @@ public class Main {
 		LOG.info(" - Inter path 0: " + intermediatePath0);
 		LOG.info(" - Inter path 1: " + intermediatePath1);
 		LOG.info(" - Inter path 2: " + intermediatePath2);
-		LOG.info(" - Decade bigram path: " + decadeBigramCountPath);
 		
 		Configuration conf = new Configuration();
 		conf.set("intermediatePath1", intermediatePath1);
