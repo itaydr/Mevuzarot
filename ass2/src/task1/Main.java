@@ -89,34 +89,20 @@ public class Main {
 			String[] arr = value.toString().trim().split("\\s+");
 			
 			if (!AppearanceCountMapper.validateInput2gram(arr)) {
-				//System.out.println("Not 2gram = " + value);
 				return;
 			}
-			
-			//Configuration conf = context.getConfiguration();
-			//if (conf.get("one") == null) {
-			//	conf.set("one", "1");
-			//}
-			//else {
-			//	return;
-			//}
-			
+
 			String w1 = arr[0];
 			String w2 = arr[1];
 			
 			if (usingStopWords && (StopWords.isStopWord(w1, usingEnglish) || StopWords.isStopWord(w2, usingEnglish))) {
-				//System.out.println("Stopped word! = " + value);
 				return;
 			}
 			
 			W1.set(w1);
 			W2.set(w2);
 			String decade = arr[2].substring(0, 3);
-			
-			
-			//if (decade.charAt(0) != '1' && decade.charAt(0) != '2') 
-				//return;
-			
+	
 			DECADE.set(decade); // 1998 - > 199
 			ARRAY[0] = W1;
 			ARRAY[1] = W2;
@@ -135,14 +121,6 @@ public class Main {
 			COUNT.set(count);
 			TextKey.set(KEY.toString());
 			context.write(TextKey, COUNT);
-			
-			//TODO:
-			//COUNT.set(COUNT.get() + 2);
-			//context.write(TextKey, COUNT);
-			//ARRAY[0] = new Text("HELLO");
-			//KEY.set(ARRAY);
-			//TextKey.set(KEY.toString());
-			//context.write(TextKey, COUNT);
 		}
 	}
 
@@ -300,7 +278,6 @@ public class Main {
 				 return true;
 			 }
 			 else {
-				 //	LOG.info("Bad input for mapper --> (" + value + ")::(" + arr.length + ")");
 				 return false;
 			 }
 		}
@@ -309,11 +286,6 @@ public class Main {
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			
-			 //* Input - w1 w2 decade count decadeCount
-			 //* output - <w1, left, decade> -> w2 count decadeCount
-			 
-			 
 			String[] arr = value.toString().trim().split("\\s+");
 			
 			if (arr.length < 4) {
@@ -340,7 +312,6 @@ public class Main {
 			KEY.set(RIGHT + S + w2 + S + decade + LOWEST_ASCII); // r w2 decade
 			context.write(KEY, VAL);
 			
-			//LOG.info("1::    " + value.toString() + "//// output - " + KEY+ " :: "  + VAL);
 		}
 	}
 
@@ -411,11 +382,11 @@ public class Main {
 
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
-			//System.out.println("PMI mapper in - " + key + ":" + value);
+		
 			String[] arr = value.toString().trim().split("\\s+");
 			String first = arr[0]; // this is served as the type for left/right lines.
 			String w1, w2, decade, count, decadeCount;
-			// TODO: check if has 3 slots.
+	
 			if (first.equals(LEFT)) {
 				//left w1 w2 decade count sum
 				
@@ -524,17 +495,6 @@ public class Main {
 			double pmi = Math.log(probPair / (probLeft * probRight));
 			double npmi = pmi / (-Math.log(probPair));
 			
-			/*
-			System.out.println("word =" + key + " decadeCount= " + decadeCount
-					+ ", count= " + count
-					+ ", leftSum=" + leftSum + ", rightSum=" + rightSum
-					+ ", probPair :" + probPair + ", probLeft = " + probLeft + 
-					", probRight :" + probRight + ", pmi :" + pmi
-					+ ", npmi :" + npmi);
-			*/
-			
-			//System.out.println("PMI - pair - " + probPair + ", left= " + probLeft + ", " + probRight + ", totalDocs = "+ totalDocs + ", pmi = "+ pmi + ", npmi = " + npmi);
-			
 			KEY.set(keyArr[0] + S + keyArr[1]); // w1
 			VAL.set(keyArr[2] +  S + npmi + S + pmi);
 			
@@ -556,7 +516,6 @@ public class Main {
 		// Objects for reuse
 		private final static FinalOutputWritable KEY = new FinalOutputWritable();
 		private final static Text VAL = new Text();
-		//private static int count = 50;
 		
 		@Override
 		public void map(LongWritable key, Text value, Context context)
@@ -568,15 +527,7 @@ public class Main {
 				System.out.println("Bad length PmiFilterMapper " + key + ", " + value);
 				return;
 			}
-			
-			//if (count == 0) {
-			//	return;
-				
-			//}
-			//else {
-			//	count--;
-			//}
-			
+
 			KEY.decade = Integer.parseInt(arr[2]);
 			KEY.npmi = Double.parseDouble(arr[3]);
 			KEY.isSecondary = true;
@@ -636,10 +587,6 @@ public class Main {
 				Context context) throws IOException, InterruptedException {
 			
 			String[] arr = null;
-			//System.out.println("Reducer key =" + key + "=, sum = " + totalPmiInDecade);
-		
-			//LOG.info("PmiFilterReducer key =>" + key + "<= isSec = " + (key.isSecondary ? "YES" : "NO") + ", sum = " + totalPmiInDecade +" minPmi " + minPmi + ", rel " + relMinPmi);
-			
 			if (lastDecade != key.decade)  {
 				totalPmiInDecade = 0;
 			}
@@ -648,13 +595,6 @@ public class Main {
 			
 			if (key.isSecondary) {
 				for (Text value : values) {
-					//arr = value.toString().trim().split("\\s+");
-					
-					//if (arr.length < 3) {
-					//	System.out.println("Bad length PmiFilterReducer " + key + ", " + value);
-					//	return;
-					//}
-					
 					double npmi = key.npmi;
 					totalPmiInDecade += npmi;
 				}
@@ -662,11 +602,7 @@ public class Main {
 			else {
 				for (Text value : values) {
 					arr = value.toString().trim().split("\\s+");
-					//if (arr.length < 4) {
-					//	System.out.println("Bad length PmiFilterReducer 2 " + key + ", " + value);
-					//	return;
-					//}
-					
+
 					double npmi = key.npmi;
 					if (npmi >  minPmi || (npmi / totalPmiInDecade) > relMinPmi) {
 						
@@ -683,14 +619,8 @@ public class Main {
 						
 						KEY.set("\t\t" + arr[0] + "\t\t" + arr[1] + "\t\t" +npmi + "\t\t" +  arr[2]);
 						VAL.set("");
-						//KEY.set(String.valueOf(npmi)); // npmi
-						//VAL.set("\t\t" + arr[2] + S +arr[0] + S +arr[1]); // pmi w1 w2
 						context.write(KEY, VAL);
 					}
-					else {
-						//LOG.info("PmiFilterReducer failed =" + key + "=, sum = " + totalPmiInDecade + ", npmi = " + npmi);
-					}
-					
 				}
 			}
 		}
