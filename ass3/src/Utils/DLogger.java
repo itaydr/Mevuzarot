@@ -10,7 +10,7 @@ public class DLogger {
 
 	public void log(String logStr) {
 		if (this.enabled) {
-			
+			System.out.println(logStr);
 		}
 	}
 	

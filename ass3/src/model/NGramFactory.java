@@ -13,11 +13,12 @@ public class NGramFactory {
 	 *  Syntactic biarcs NGram -
 	 *  	that/IN/compl/3 patients/NNS/nsubj/3 experience/VB/ccomp/0
 	 */
-	final static int NUMER_OF_OBJECTS_IN_MAIN_ARRAY = 4;
-	final static int TOTAL_COUNT_INDEX = 2;
-	final static int NGRAM_INDEX = 1;
+	final static int NUMER_OF_OBJECTS_IN_MAIN_ARRAY = 3;
+	final static int TOTAL_COUNT_INDEX = 1;
+	final static int NGRAM_INDEX = 0;
 	final static int MIN_SYNTACTIC_NGRAM_LENGTH = 3;
 	final static DLogger L = new DLogger(true);
+	final static String SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR = "  "; // Two spaces.
 		
 	public static NGram parseNGram(String ngramStr) {
 		
@@ -26,7 +27,7 @@ public class NGramFactory {
 			return null;
 		}
 		
-		String[] mainArr = ngramStr.split("\t");
+		String[] mainArr = ngramStr.split("      ");
 		
 		if (mainArr.length != NUMER_OF_OBJECTS_IN_MAIN_ARRAY) {
 			L.log("Less then " + NUMER_OF_OBJECTS_IN_MAIN_ARRAY + " objcts in the NGram array: " + ngramStr);
@@ -41,7 +42,16 @@ public class NGramFactory {
 		catch (Exception e) {L.log("Failed to parse count: " + countStr + " for ngram: " + ngramStr);}
 		
 		String syntacticNgram = mainArr[NGRAM_INDEX];
+		String[] syntacticNGramWithHeadArr = syntacticNgram.split(SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR);
+		
+		if (syntacticNGramWithHeadArr.length != 2) {
+			L.log("Not enough args with head in ngram " + syntacticNGramWithHeadArr);
+			return null;
+		}
+		
+		syntacticNgram = syntacticNGramWithHeadArr[1];
 		String[] syntacticNGramArr = syntacticNgram.split(" ");
+		
 		
 		if (syntacticNGramArr.length < MIN_SYNTACTIC_NGRAM_LENGTH) {
 			L.log("Too few arguments in syntactic ngram: ." + syntacticNgram);
@@ -90,8 +100,8 @@ public class NGramFactory {
 		}
 		
 		String acc = "";
-		for (int i = 1 ; i < syntacticNGramArr.length-2 ; i++) {
-			acc += syntacticNGramArr[i];
+		for (int i = 1 ; i < syntacticNGramArr.length-1 ; i++) {
+			acc += syntacticNGramArr[i] + " ";
 		}
 		
 		return acc;

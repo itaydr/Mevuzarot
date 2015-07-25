@@ -18,18 +18,20 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 import Utils.Constants;
 import Utils.DLogger;
 import mapreduce.Partitioner;
+import model.NGram;
+import model.NGramFactory;
 
 public class JobConstructor {
 		
 	final static DLogger L = new DLogger(true);
 	private final static int MIN_INPUT_ARGS_COUNT = 2;
 	
-	///*
-	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/mi_info_extractor";
-	//*/
 	/*
-	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "/user/hduser/mi_info_extractor";
+	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/mi_info_extractor";
 	*/
+	///*
+	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_info_extractor";
+	//*/
 	
 	/**
 	 * Input - 
@@ -44,7 +46,7 @@ public class JobConstructor {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-		
+						
 		if (args.length < MIN_INPUT_ARGS_COUNT) {
 			L.log("Please provide at least two arguments.");
 			System.exit(0);
