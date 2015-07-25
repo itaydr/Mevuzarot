@@ -23,14 +23,14 @@ public class MIInfoExtractor {
 	/**************************
 	 * 
 	 * This mapper is incharge of multiple mappings - 
-	 * 1. <p, slotX, w1> -> <count>		[4]
-	 * 2. <p, slotY, w2> -> <Count>		[4]
-	 * 3. <*, slotX, *> -> <Ngram>		[7]
-	 * 4. <*, slotY, *> -> <NGram>		[7]
-	 * 5. <p, slotX, *> -> <Ngram>		[7]
-	 * 6. <p, slotY, *> -> <NGram>		[7]
-	 * 7. <*, slotX, w1> -> <Ngram>		[7]
-	 * 8. <*, slotY, w2> -> <NGram>		[7]
+	 * 1. <type, p, slotX, w1> -> <count>		[5]
+	 * 2. <type, p, slotY, w2> -> <Count>		[5]
+	 * 3. <type, *, slotX, *> -> <Ngram>		[8]
+	 * 4. <type, *, slotY, *> -> <NGram>		[8]
+	 * 5. <type, p, slotX, *> -> <Ngram>		[8]
+	 * 6. <type, p, slotY, *> -> <NGram>		[8]
+	 * 7. <type, *, slotX, w1> -> <Ngram>		[8]
+	 * 8. <type, *, slotY, w2> -> <NGram>		[8]
 	 * 
 	 * 
 	 * Input is the initial ngram input files.
@@ -58,12 +58,12 @@ public class MIInfoExtractor {
 			
 			emitSlotX(context, ngram); // 1
 			emitSlotY(context, ngram); // 2
-			emitSlotCount(context, ngram, Constants.SLOT_X); // 3 
-			emitSlotCount(context, ngram, Constants.SLOT_Y); // 4
-			emitWordCountInSlotForPath(context, ngram, Constants.SLOT_X); // 5
-			emitWordCountInSlotForPath(context, ngram, Constants.SLOT_Y); // 6
-			emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_X, ngram.slotX); // 7
-			emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_Y, ngram.slotY); // 8
+			emitSlotCount(context, ngram, Constants.SLOT_X, Constants.WILD_SLOTX_WILD); // 3 
+			emitSlotCount(context, ngram, Constants.SLOT_Y, Constants.WILD_SLOTY_WILD); // 4
+			emitWordCountInSlotForPath(context, ngram, Constants.SLOT_X, Constants.P_SLOTX_WILD); // 5
+			emitWordCountInSlotForPath(context, ngram, Constants.SLOT_Y, Constants.P_SLOTY_WILD); // 6
+			emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_X, ngram.slotX, Constants.WILD_SLOTX_W1); // 7
+			emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_Y, ngram.slotY, Constants.WILD_SLOTY_W2); // 8
 		}
 		
 		/**
@@ -71,7 +71,7 @@ public class MIInfoExtractor {
 		 * @param ngram
 		 */
 		private void emitSlotX(Context context, NGram ngram) throws IOException, InterruptedException{
-			String key = ngram.path + Constants.S + Constants.SLOT_X + Constants.S + ngram.slotX;
+			String key = Constants.P_SLOTX_W1 + Constants.S + ngram.path + Constants.S + Constants.SLOT_X + Constants.S + ngram.slotX;
 			emitDuplicatedLine(context, key, String.valueOf(ngram.count));
 		}
 		
@@ -80,7 +80,7 @@ public class MIInfoExtractor {
 		 * @param ngram
 		 */
 		private void emitSlotY(Context context, NGram ngram) throws IOException, InterruptedException{
-			String key = ngram.path + Constants.S + Constants.SLOT_Y + Constants.S + ngram.slotY;
+			String key = Constants.P_SLOTY_W2 + Constants.S + ngram.path + Constants.S + Constants.SLOT_Y + Constants.S + ngram.slotY;
 			emitDuplicatedLine(context, key, String.valueOf(ngram.count));
 		}
 		
@@ -88,8 +88,8 @@ public class MIInfoExtractor {
 		 * Emits <*, Slot, *> -> <w1, w2, p, count>
 		 * @param ngram
 		 */
-		private void emitSlotCount(Context context, NGram ngram, String slotIdentifier) throws IOException, InterruptedException{
-			String key =  Constants.WILDCARD + Constants.S + slotIdentifier + Constants.S + Constants.WILDCARD;
+		private void emitSlotCount(Context context, NGram ngram, String slotIdentifier, String tokenIdentifier) throws IOException, InterruptedException{
+			String key =  tokenIdentifier + Constants.S + Constants.WILDCARD + Constants.S + slotIdentifier + Constants.S + Constants.WILDCARD;
 			emitDuplicatedLine(context, key, ngram.toString());
 		}
 		
@@ -97,8 +97,8 @@ public class MIInfoExtractor {
 		 * Emits  <p, slot, *> -> <Ngram>
 		 * @param ngram
 		 */
-		private void emitWordCountInSlotForPath(Context context, NGram ngram, String slotIdentifier) throws IOException, InterruptedException{
-			String key =  ngram.path + Constants.S + slotIdentifier + Constants.S + Constants.WILDCARD;
+		private void emitWordCountInSlotForPath(Context context, NGram ngram, String slotIdentifier, String tokenIdentifier) throws IOException, InterruptedException{
+			String key =  tokenIdentifier + Constants.S + ngram.path + Constants.S + slotIdentifier + Constants.S + Constants.WILDCARD;
 			emitDuplicatedLine(context, key, ngram.toString());
 		}
 		
@@ -106,8 +106,8 @@ public class MIInfoExtractor {
 		 * Emits   <*, slot, w1> -> <Ngram>
 		 * @param ngram
 		 */
-		private void emitPathCountForSlotAndWord(Context context, NGram ngram, String slotIdentifier, String word) throws IOException, InterruptedException{
-			String key =  Constants.WILDCARD + Constants.S + slotIdentifier + Constants.S + word;			
+		private void emitPathCountForSlotAndWord(Context context, NGram ngram, String slotIdentifier, String word, String tokenIdentifier) throws IOException, InterruptedException{
+			String key =  tokenIdentifier + Constants.S + Constants.WILDCARD + Constants.S + slotIdentifier + Constants.S + word;			
 			emitDuplicatedLine(context, key, ngram.toString());
 		}
 		
