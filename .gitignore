@@ -8,3 +8,105 @@ Credentials.java
 Jars/ass2_only_first.jar
 Jars/ass2_runner.jar
 Jars/ass2_without_delete.jar
+input/eng-2gram-10k
+input/Final.zip
+input/part-r-00000
+input/stderr.gz
+input/syslog.gz
+input/Final/eng-stop.zip
+input/Final/eng.zip
+input/Final/heb-stop.zip
+input/Final/heb.zip
+input/Final/part-r-00000
+input/Final/part-r-00001
+input/Final/heb-stop/_SUCCESS
+input/Final/heb-stop/part-r-00000
+input/Final/heb-stop/part-r-00001
+input/Final/heb-stop/part-r-00002
+input/Final/heb-stop/part-r-00003
+input/Final/heb-stop/part-r-00004
+input/Final/heb-stop/part-r-00005
+input/Final/heb-stop/part-r-00006
+input/Final/heb-stop/part-r-00007
+input/Final/heb-stop/part-r-00008
+input/Final/output-heb/_SUCCESS
+input/Final/output-heb/part-r-00000
+input/Final/output-heb/part-r-00001
+input/Final/output-heb/part-r-00002
+input/Final/output-heb/part-r-00003
+input/Final/output-heb/part-r-00004
+input/Final/output-heb/part-r-00005
+input/Final/output-heb/part-r-00006
+input/Final/output-heb/part-r-00007
+input/Final/output-heb/part-r-00008
+input/Final/output-small/_SUCCESS
+input/Final/output-small/part-r-00000
+input/Final/output-small/part-r-00001
+input/Final/output-small/part-r-00002
+input/Final/output-small/part-r-00003
+input/Final/output-small/part-r-00004
+input/Final/output-small/part-r-00005
+input/Final/output-small/part-r-00006
+input/Final/output-small/part-r-00007
+input/Final/output-small/part-r-00008
+input/Final/output-small 2/_SUCCESS
+input/Final/output-small 2/part-r-00000
+input/Final/output-small 2/part-r-00001
+input/Final/output-small 2/part-r-00002
+input/Final/output-small 2/part-r-00003
+input/Final/output-small 2/part-r-00004
+input/Final/output-small 2/part-r-00005
+input/Final/output-small 2/part-r-00006
+input/Final/output-small 2/part-r-00007
+input/Final/output-small 2/part-r-00008
+input/Final/output-small 3/_SUCCESS
+input/Final/output-small 3/part-r-00000
+input/Final/output-small 3/part-r-00001
+input/Final/output-small 3/part-r-00002
+input/Final/output-small 3/part-r-00003
+input/Final/output-small 3/part-r-00004
+input/Final/output-small 3/part-r-00005
+input/Final/output-small 3/part-r-00006
+input/Final/output-small 3/part-r-00007
+input/Final/output-small 3/part-r-00008
+input/heb/_SUCCESS
+input/heb/part-r-00000
+input/heb/part-r-00001
+input/heb/part-r-00002
+input/heb/part-r-00003
+input/heb/part-r-00004
+input/heb/part-r-00005
+input/heb/part-r-00006
+input/heb/part-r-00007
+input/heb/part-r-00008
+input/heb-stop/_SUCCESS
+input/heb-stop/part-r-00000
+input/heb-stop/part-r-00001
+input/heb-stop/part-r-00002
+input/heb-stop/part-r-00003
+input/heb-stop/part-r-00004
+input/heb-stop/part-r-00005
+input/heb-stop/part-r-00006
+input/heb-stop/part-r-00007
+input/heb-stop/part-r-00008
+input/output-small/_SUCCESS
+input/output-small/part-r-00000
+input/output-small/part-r-00001
+input/output-small/part-r-00002
+input/output-small/part-r-00003
+input/output-small/part-r-00004
+input/output-small/part-r-00005
+input/output-small/part-r-00006
+input/output-small/part-r-00007
+input/output-small/part-r-00008
+Jars/ass22.jar
+output/_SUCCESS
+output/part-r-00000
+output/part-r-00001
+output/part-r-00002
+output/part-r-00003
+output/part-r-00004
+output/part-r-00005
+output/part-r-00006
+output/part-r-00007
+output/part-r-00008
