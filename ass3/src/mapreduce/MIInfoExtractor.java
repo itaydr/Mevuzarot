@@ -5,32 +5,37 @@ import java.io.IOException;
 import model.NGram;
 import model.NGramFactory;
 import Utils.Constants;
+import Utils.DLogger;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
+import org.apache.hadoop.mapreduce.Reducer;
 import org.apache.hadoop.mapreduce.Mapper.Context;
+import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
 public class MIInfoExtractor {
 
+	final static DLogger L = new DLogger(true);
+	
 	/**************************
 	 * 
 	 * This mapper is incharge of multiple mappings - 
-	 * 1. <p, slotX, w1> -> <count>
-	 * 2. <p, slotY, w2> -> <Count>
-	 * 3. <*, slotX, *> -> <Ngram>
-	 * 4. <*, slotY, *> -> <NGram>
-	 * 5. <p, slotX, *> -> <Ngram>
-	 * 6. <p, slotY, *> -> <NGram>
-	 * 7. <*, slotX, w1> -> <Ngram>
-	 * 8. <*, slotY, w2> -> <NGram>
+	 * 1. <p, slotX, w1> -> <count>		[4]
+	 * 2. <p, slotY, w2> -> <Count>		[4]
+	 * 3. <*, slotX, *> -> <Ngram>		[7]
+	 * 4. <*, slotY, *> -> <NGram>		[7]
+	 * 5. <p, slotX, *> -> <Ngram>		[7]
+	 * 6. <p, slotY, *> -> <NGram>		[7]
+	 * 7. <*, slotX, w1> -> <Ngram>		[7]
+	 * 8. <*, slotY, w2> -> <NGram>		[7]
 	 * 
 	 * 
 	 * Input is the initial ngram input files.
 	 */
-	private static class MIInfoExtractorMapper extends
+	public static class MIInfoExtractorMapper extends
 			Mapper<LongWritable, Text, Text, Text> {
 
 		// Objects for reuse
@@ -119,5 +124,76 @@ public class MIInfoExtractor {
 			Key.set(key+Constants.LOWEST_ASCII);
 			context.write(Key, Val);
 		}
+	}
+	
+	/**
+	 * 
+	 * Input - @see MIInfoExtractorMapper. Can accept any of it's outputs.
+	 * 
+	 * Output - Basically we out put the original data received by each line, with the full
+	 * 			count for the key, appended to it by a seperator. 
+	 * 	
+	 * @note - we assume that the last object in the Val received from the mapper is always the count.
+	 * 
+	 * @author asaf
+	 *
+	 */
+	public static class MIInfoExtractorReducer extends
+			Reducer<Text, Text, Text, Text> {
+		// Reuse objects
+
+		private final static Text KEY = new Text();
+		private final static Text VAL = new Text();
+		private static long sum = 0;
+
+		@Override
+		public void reduce(Text key, Iterable<Text> values,
+				Context context) throws IOException, InterruptedException {
+
+			if (sum == 0) {
+				for (Text value : values) {
+					String valStr = value.toString();
+					String arr[] = valStr.trim().split(Constants.S);
+					double count = 0;
+					try {
+					count = Double.parseDouble(arr[arr.length-1]);
+					} catch (Exception e) {L.log("Failed to parse the count for line : " + value); }
+					sum += count; 
+				}
+			}
+			else {
+				
+				for (Text value : values) {
+					String finalKey = key.toString() + Constants.S + value.toString() + Constants.S + String.valueOf(sum); 
+					KEY.set(finalKey);
+					VAL.set("");
+					context.write(KEY,VAL);
+				}
+				sum = 0;
+			}
+		}
+	}
+	
+	/**
+	 * This class makes sure that all duplicated keys will get to the same reducer.
+	 * @author asaf
+	 *
+	 */
+	public static class DuplicateKeysPartitioner extends HashPartitioner<Text, Text> {
+		
+		private static final Text TMP = new Text();
+		
+		@Override
+		public int getPartition(Text key, Text value, int numReduceTasks) {
+			String str = key.toString();
+			Text KEY = key;
+			if (str.substring(str.length() - 1).equals(Constants.LOWEST_ASCII)) {
+				// This is a secondary key
+				TMP.set(str.substring(0, str.length() - 1));
+				KEY = TMP;
+			}
+			
+			return super.getPartition(KEY, value, numReduceTasks);
+	    }
 	}
 }
