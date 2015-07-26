@@ -164,7 +164,7 @@ public class MIInfoExtractor {
 			else {
 				
 				for (Text value : values) {
-					String finalKey = key.toString() + Constants.S + value.toString() + Constants.S + String.valueOf(sum); 
+					String finalKey = key.toString().trim() + Constants.S + value.toString().trim() + Constants.S + String.valueOf(sum); 
 					KEY.set(finalKey);
 					VAL.set("");
 					context.write(KEY,VAL);
