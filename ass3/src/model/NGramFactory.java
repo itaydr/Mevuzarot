@@ -13,12 +13,16 @@ public class NGramFactory {
 	 *  Syntactic biarcs NGram -
 	 *  	that/IN/compl/3 patients/NNS/nsubj/3 experience/VB/ccomp/0
 	 */
-	final static int NUMER_OF_OBJECTS_IN_MAIN_ARRAY = 3;
-	final static int TOTAL_COUNT_INDEX = 1;
-	final static int NGRAM_INDEX = 0;
-	final static int MIN_SYNTACTIC_NGRAM_LENGTH = 3;
-	final static DLogger L = new DLogger(true);
+	final static int NUMER_OF_OBJECTS_IN_MAIN_ARRAY 	= 3;
+	final static int TOTAL_COUNT_INDEX					= 1;
+	final static int NGRAM_INDEX 						= 0;
+	final static int MIN_SYNTACTIC_NGRAM_LENGTH 		= 3;
+	final static DLogger L 								= new DLogger(true);
 	final static String SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR = "  "; // Two spaces.
+	final static String PARSED_WORD_SPLIT_CHAR 			= "/";
+	final static String NOUN_PREFIX 					= "NN";
+	final static String VERB_PREFIX 					= "VB";
+	final static int INDEX_OF_HEAD_WORD					= 0;
 		
 	public static NGram parseNGram(String ngramStr) {
 		
@@ -58,9 +62,49 @@ public class NGramFactory {
 			return null;
 		}
 		
-		String slotX = slotXFromSyntacticNGramStr(syntacticNGramArr);
-		String slotY = slotYFromSyntacticNGramStr(syntacticNGramArr);
-		String path = pathFromSyntacticNGramStr(syntacticNGramArr);
+		String slotX = null;//slotXFromSyntacticNGramStr(syntacticNGramArr);
+		String slotY = null;//slotYFromSyntacticNGramStr(syntacticNGramArr);
+		String path = null;//pathFromSyntacticNGramStr(syntacticNGramArr);
+		
+		for (int i = 0 ; i < syntacticNGramArr.length ; i++) {
+			String parsedWord =  syntacticNGramArr[i];
+			String[] parts = parsedWord.trim().split(PARSED_WORD_SPLIT_CHAR);
+			if (parts.length < 4) {
+				continue;
+			}
+			
+			String type = parts[1];
+			int index = -1;
+			try {
+				index = Integer.parseInt(parts[3]);
+			}catch(Exception e) {L.log("Failed to parse word " + parsedWord);}
+			
+			if (index == -1) {
+				continue;
+			}
+			// Root
+			else if (index == 0) {
+				if (!type.startsWith(VERB_PREFIX)) {
+					// All roots must be verbs!
+					return null;
+				}
+			}
+			
+			boolean isNoun = type.startsWith(NOUN_PREFIX);
+			if (slotX == null && isNoun) {
+				slotX = parsedWord;
+				continue;
+			}
+			else if (slotY == null && isNoun) {
+				slotY = parsedWord;
+				continue;
+			}
+			else if (path != null) {
+				path += " ";
+			}
+			
+			path += parsedWord;
+		}
 		
 		if (slotX == null || slotY == null || path == null || count == 0) {
 			L.log("Failed to parse, one of the objects was not proper: " + ngramStr);
@@ -73,13 +117,31 @@ public class NGramFactory {
 		
 	}
 	
+	private static boolean isWordVerb(String parsedWord) {
+		String type = NGramFactory.wordTypeFromString(parsedWord);
+		return type.startsWith(VERB_PREFIX);
+	}
+	
+	private static boolean isWordNoun(String parsedWord) {
+		String type = NGramFactory.wordTypeFromString(parsedWord);
+		return type.startsWith(NOUN_PREFIX);
+	}
+	
+	private static String wordTypeFromString(String parsedWord) {
+		String[] parts = parsedWord.trim().split(PARSED_WORD_SPLIT_CHAR);
+		if (parts.length < 4) {
+			return "";
+		}
+		
+		return parts[1]; 
+	}
+	
 	private static String slotYFromSyntacticNGramStr(String[] syntacticNGramArr) {
 		if (syntacticNGramArr == null || syntacticNGramArr.length == 0) {
 			L.log("Cannot fetch slotY from empty array.");
 			return null;
 		}
 		
-		// TODO: fetch real slotY.
 		return syntacticNGramArr[syntacticNGramArr.length-1];
 	}
 	
