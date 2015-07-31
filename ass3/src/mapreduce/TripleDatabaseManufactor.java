@@ -122,6 +122,9 @@ public class TripleDatabaseManufactor {
 				if (slot.equals(Constants.SLOT_X)) {
 					tripleEntry.addSlotX(slotEntry);
 				}
+				else {
+					tripleEntry.addSlotY(slotEntry);
+				}
 			}
 			
 			double sim = PaperHuristics.calculateSim(p1Entry, p2Entry);
