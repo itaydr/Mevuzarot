@@ -1,27 +1,24 @@
 package main;
 
+import huristics.PaperHuristics;
 import mapreduce.MICalculator.MICalculatorMapper;
 import mapreduce.MICalculator.MICalculatorReducer;
 import mapreduce.MIInfoExtractor.MIInfoExtractorMapper;
 import mapreduce.MIInfoExtractor.MIInfoExtractorReducer;
+import mapreduce.TripleDatabaseManufactor.TripleDatabaseManufactorMapper;
+import mapreduce.TripleDatabaseManufactor.TripleDatabaseManufactorReducer;
+import model.TripleEntry;
+import model.TripleSlotEntry;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
-import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
-import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
-import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
-import Utils.Constants;
 import Utils.DLogger;
-import mapreduce.Partitioner;
-import model.NGram;
-import model.NGramFactory;
 
 public class JobConstructor {
 
@@ -33,13 +30,55 @@ public class JobConstructor {
 	  "s3n://mevuzarot.task2/intermediate/mi_info_extractor";
 	private static final String MI_CALCULATOR_INTERMEDIATE_PATH =
 			"s3n://mevuzarot.task2/intermediate/mi_calculator";
+	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/triple_database";
+
 	 */
 	///*
 	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_info_extractor";
 	private static final String MI_CALCULATOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_calculator";
+	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH = "/user/hduser/ass3/triple_database";
 
 	//*/
 
+	private static void test() {
+		TripleEntry e = new TripleEntry("X loves Y");
+		e.addSlotX(new TripleSlotEntry("Hello", 21, 2.0));
+		e.addSlotX(new TripleSlotEntry("World", 45, 2.50));
+		e.addSlotX(new TripleSlotEntry("How", 77, 2.30));
+		e.addSlotX(new TripleSlotEntry("Are", 88, 1.0));
+		e.addSlotX(new TripleSlotEntry("You", 32, 5.0));
+		e.addSlotY(new TripleSlotEntry("WHello", 31, 3.4));
+		e.addSlotY(new TripleSlotEntry("WWorld", 95, 6.50));
+		e.addSlotY(new TripleSlotEntry("WHow", 27, 1.30));
+		e.addSlotY(new TripleSlotEntry("WAre", 83, 7.0));
+		e.addSlotY(new TripleSlotEntry("WYou", 35, 4.3));
+		
+		TripleEntry e2 = new TripleEntry("X likes Y");
+		e2.addSlotX(new TripleSlotEntry("Hello", 21, 2.0));
+		e2.addSlotX(new TripleSlotEntry("World", 45, 2.50));
+		e2.addSlotX(new TripleSlotEntry("How", 77, 2.30));
+		e2.addSlotX(new TripleSlotEntry("Are", 88, 1.0));
+		e2.addSlotX(new TripleSlotEntry("sdf", 88, 1.0));
+		e2.addSlotX(new TripleSlotEntry("sdff", 88, 1.0));
+		
+		
+		
+		e2.addSlotX(new TripleSlotEntry("You", 32, 5.0));
+		e2.addSlotY(new TripleSlotEntry("WHello", 31, 3.4));
+		e2.addSlotY(new TripleSlotEntry("WWorld", 95, 6.50));
+		
+		e2.addSlotY(new TripleSlotEntry("dsfssss", 95, 6.50));
+		double sim = PaperHuristics.calculateSim(e, e2);
+		e2.addSlotY(new TripleSlotEntry("WHow", 27, 1.30));
+		e2.addSlotY(new TripleSlotEntry("WAre", 83, 7.0));
+		e2.addSlotY(new TripleSlotEntry("WYou", 35, 4.3));
+		
+		
+		double sim1 = PaperHuristics.calculateSim(e, e);
+		
+		double both = sim + sim1;
+	}
+	
 	/**
 	 * Input - 0. Input path. 1. Output path. 2. DPMinCount 3. MinFeatureNum 4.
 	 * Is running in cloud
@@ -50,6 +89,8 @@ public class JobConstructor {
 	 */
 	public static void main(String[] args) throws Exception {
 
+		//test();
+		
 		if (args.length < MIN_INPUT_ARGS_COUNT) {
 			L.log("Please provide at least two arguments.");
 			System.exit(0);
@@ -59,12 +100,14 @@ public class JobConstructor {
 		String outputPath = args[1];
 		String miInforExtractorIntermediatePath = MIINFO_EXTRACTOR_INTERMEDIATE_PATH;
 		String miCalculatorIntemediatePath = MI_CALCULATOR_INTERMEDIATE_PATH;
+		String tripleDatabaseIntermediatePath = TRIPLE_DATABASE_INTERMEDIATE_PATH;
 		
 		L.log("JobCostructor start:");
 		L.log(" - input path: " + inputPath);
 		L.log(" - output path: " + outputPath);
 		L.log(" - MIInfoExtractor path: " + miInforExtractorIntermediatePath);
 		L.log(" - MICalculator path: " + miCalculatorIntemediatePath);
+		L.log(" - TripleDatabase path: " + tripleDatabaseIntermediatePath);
 		
 		
 		Configuration conf = new Configuration();
@@ -100,7 +143,7 @@ public class JobConstructor {
 		}
 		startTime = System.currentTimeMillis();
 		status = miInfoExtractorJob.waitForCompletion(true);
-		L.log("PairsPmiCounter Job Finished in "
+		L.log("miInfoExtractorJob Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
 
@@ -125,10 +168,35 @@ public class JobConstructor {
 		}
 		startTime = System.currentTimeMillis();
 		status = miCalculatorJob.waitForCompletion(true);
-		L.log("PairsPmiCounter Job Finished in "
+		L.log("miCalculatorJob Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
-
-		System.exit(0);
-	}
-}
+		
+		// Third job
+		Job tripleJob = Job.getInstance(conf);
+		tripleJob.setJobName("miCalculatorJob");
+		tripleJob.setJarByClass(JobConstructor.class);
+		tripleJob.setMapperClass(TripleDatabaseManufactorMapper.class);
+		tripleJob.setReducerClass(TripleDatabaseManufactorReducer.class);
+		
+		// Set Output and Input Parameters
+		tripleJob.setOutputKeyClass(Text.class);
+		tripleJob.setOutputValueClass(Text.class);
+		
+		FileInputFormat.addInputPath(tripleJob, new Path(miCalculatorIntemediatePath));
+		FileOutputFormat.setOutputPath(tripleJob, new Path(
+				tripleDatabaseIntermediatePath));
+		
+		if (!isRunningInCloud) {
+			Path outputDir0 = new Path(tripleDatabaseIntermediatePath);
+			FileSystem.get(conf).delete(outputDir0, true);
+		}
+		startTime = System.currentTimeMillis();
+		status = tripleJob.waitForCompletion(true);
+		L.log("tripleJob Job Finished in "
+				+ (System.currentTimeMillis() - startTime) / 1000.0
+				+ " seconds");
+		
+			System.exit(0);
+	}	
+}	

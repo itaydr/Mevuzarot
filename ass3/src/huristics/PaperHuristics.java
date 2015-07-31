@@ -67,12 +67,12 @@ public class PaperHuristics {
 		}
 		
 		double sumOf1 = 0.0;
-		for (TripleSlotEntry entry : mutualSlot1) {
+		for (TripleSlotEntry entry : tripleSlots1) {
 			sumOf1 += entry.mi;
 		}
 		
 		double sumOf2 = 0.0;
-		for (TripleSlotEntry entry : mutualSlot2) {
+		for (TripleSlotEntry entry : tripleSlots2) {
 			sumOf2 += entry.mi;
 		}
 		
