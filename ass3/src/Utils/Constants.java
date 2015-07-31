@@ -1,6 +1,8 @@
 package Utils;
 
 public class Constants {
+	
+	public final static String SPACE = " ";
 	public final static String WILDCARD = "*";
 	public final static String S = "      ";
 	// TODO: revert to tab?. 

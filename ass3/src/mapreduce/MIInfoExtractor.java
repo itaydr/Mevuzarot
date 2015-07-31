@@ -51,19 +51,22 @@ public class MIInfoExtractor {
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			NGram ngram = NGramFactory.parseNGram(value.toString());
-			if (ngram == null) {
+			NGram[] ngrams = NGramFactory.parseNGram(value.toString());
+			if (ngrams == null) {
 				return;
 			}
 			
-			emitSlotX(context, ngram); // 1
-			emitSlotY(context, ngram); // 2
-			emitSlotCount(context, ngram, Constants.SLOT_X, Constants.WILD_SLOTX_WILD); // 3 
-			emitSlotCount(context, ngram, Constants.SLOT_Y, Constants.WILD_SLOTY_WILD); // 4
-			emitWordCountInSlotForPath(context, ngram, Constants.SLOT_X, Constants.P_SLOTX_WILD); // 5
-			emitWordCountInSlotForPath(context, ngram, Constants.SLOT_Y, Constants.P_SLOTY_WILD); // 6
-			emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_X, ngram.slotX, Constants.WILD_SLOTX_W1); // 7
-			emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_Y, ngram.slotY, Constants.WILD_SLOTY_W2); // 8
+			for (int i = 0 ; i < ngrams.length ; i++) {
+				NGram ngram = ngrams[i];
+				emitSlotX(context, ngram); // 1
+				emitSlotY(context, ngram); // 2
+				emitSlotCount(context, ngram, Constants.SLOT_X, Constants.WILD_SLOTX_WILD); // 3 
+				emitSlotCount(context, ngram, Constants.SLOT_Y, Constants.WILD_SLOTY_WILD); // 4
+				emitWordCountInSlotForPath(context, ngram, Constants.SLOT_X, Constants.P_SLOTX_WILD); // 5
+				emitWordCountInSlotForPath(context, ngram, Constants.SLOT_Y, Constants.P_SLOTY_WILD); // 6
+				emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_X, ngram.slotX, Constants.WILD_SLOTX_W1); // 7
+				emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_Y, ngram.slotY, Constants.WILD_SLOTY_W2); // 8
+			}
 		}
 		
 		/**

@@ -1,5 +1,6 @@
 package model;
 
+import Utils.Constants;
 import Utils.DLogger;
 
 
@@ -24,7 +25,7 @@ public class NGramFactory {
 	final static String VERB_PREFIX 					= "VB";
 	final static int INDEX_OF_HEAD_WORD					= 0;
 		
-	public static NGram parseNGram(String ngramStr) {
+	public static NGram[] parseNGram(String ngramStr) {
 		
 		if (ngramStr == null) {
 			L.log("Cannot parse null string.");
@@ -62,9 +63,9 @@ public class NGramFactory {
 			return null;
 		}
 		
-		String slotX = null;//slotXFromSyntacticNGramStr(syntacticNGramArr);
-		String slotY = null;//slotYFromSyntacticNGramStr(syntacticNGramArr);
-		String path = null;//pathFromSyntacticNGramStr(syntacticNGramArr);
+		String slotX = null;
+		String slotY = null;
+		String path = null;
 		
 		for (int i = 0 ; i < syntacticNGramArr.length ; i++) {
 			String parsedWord =  syntacticNGramArr[i];
@@ -72,7 +73,7 @@ public class NGramFactory {
 			if (parts.length < 4) {
 				continue;
 			}
-			
+			String word = parts[0];
 			String type = parts[1];
 			int index = -1;
 			try {
@@ -92,18 +93,18 @@ public class NGramFactory {
 			
 			boolean isNoun = type.startsWith(NOUN_PREFIX);
 			if (slotX == null && isNoun) {
-				slotX = parsedWord;
+				slotX = word;
 				continue;
 			}
 			else if (slotY == null && isNoun) {
-				slotY = parsedWord;
+				slotY = word;
 				continue;
 			}
 			else if (path != null) {
 				path += " ";
 			}
 			
-			path += parsedWord;
+			path += word;
 		}
 		
 		if (slotX == null || slotY == null || path == null || count == 0) {
@@ -111,10 +112,13 @@ public class NGramFactory {
 			return null;
 		}
 		
-		NGram ngram = new NGram(path, slotX, slotY, count);
+		NGram ngram1 = new NGram(Constants.SLOT_X + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_Y, slotX, slotY, count);
+		NGram ngram2 = new NGram(Constants.SLOT_Y + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_X, slotY, slotX, count);
+		NGram[] result = new NGram[2];
+		result[0] = ngram1;
+		result[1] = ngram2;
 		
-		return ngram;
-		
+		return result;
 	}
 	
 	private static boolean isWordVerb(String parsedWord) {
