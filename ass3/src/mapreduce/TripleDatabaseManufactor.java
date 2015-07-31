@@ -19,7 +19,7 @@ import Utils.DLogger;
 public class TripleDatabaseManufactor {
 	
 	final static DLogger L = new DLogger(true, "TripleDatabaseManufactor");
-	final static String[] Ps = {"Y nullakhter X" + Constants.S + "Y nullakhund in X"};
+	final static String[] Ps = {"X akhtar Y" + Constants.S + "X akhund Y"};
 	final static int MAPPER_INPUT_LENGTH	= 5;
 	
 	/**
@@ -107,23 +107,20 @@ public class TripleDatabaseManufactor {
 				}
 				
 				try {
-					count = Integer.parseInt(arr[3]);
-					mi = Double.parseDouble(arr[4]);
+					count = (long) Double.parseDouble(arr[3].trim());
+					mi = Double.parseDouble(arr[4].trim());
 				}catch(Exception e) {
-					L.log("Failed to parse line = " + value);
+					L.log("Failed to parse line = " + value + ", arr[3] = " + arr[3] + ", arr[4] = " + arr[4] + e);
 				}
 				
-				p = arr[0];
-				slot = arr[1];
+				p = arr[0].trim();
+				slot = arr[1].trim();
 				word = arr[2];
 				slotEntry = new TripleSlotEntry(word, count, mi);
 				
 				tripleEntry = p.equals(p1) ? p1Entry : p2Entry;
 				if (slot.equals(Constants.SLOT_X)) {
 					tripleEntry.addSlotX(slotEntry);
-				}
-				else {
-					tripleEntry.addSlotY(slotEntry);
 				}
 			}
 			

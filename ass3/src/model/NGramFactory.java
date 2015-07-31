@@ -65,7 +65,7 @@ public class NGramFactory {
 		
 		String slotX = null;
 		String slotY = null;
-		String path = null;
+		String path = "";
 		
 		for (int i = 0 ; i < syntacticNGramArr.length ; i++) {
 			String parsedWord =  syntacticNGramArr[i];
@@ -100,7 +100,7 @@ public class NGramFactory {
 				slotY = word;
 				continue;
 			}
-			else if (path != null) {
+			else if (path.length() > 0) {
 				path += " ";
 			}
 			
