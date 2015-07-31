@@ -18,7 +18,7 @@ public class NGramFactory {
 	final static int TOTAL_COUNT_INDEX					= 1;
 	final static int NGRAM_INDEX 						= 0;
 	final static int MIN_SYNTACTIC_NGRAM_LENGTH 		= 3;
-	final static DLogger L 								= new DLogger(true);
+	final static DLogger L 								= new DLogger(true, "NGramFactory");
 	final static String SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR = "  "; // Two spaces.
 	final static String PARSED_WORD_SPLIT_CHAR 			= "/";
 	final static String NOUN_PREFIX 					= "NN";

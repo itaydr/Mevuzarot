@@ -18,7 +18,7 @@ import Utils.DLogger;
 
 public class MICalculator {
 	
-	final static DLogger L = new DLogger(true);
+	final static DLogger L = new DLogger(true, "MICalculator");
 	public final static int P_SLOTX_W1_LENGTH = 6;
 	public final static int WILD_SLOTX_WILD_LENGTH = 9;
 	public final static int P_SLOTX_WILD_LENGTH = 9;

@@ -18,7 +18,7 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 
 public class MIInfoExtractor {
 
-	final static DLogger L = new DLogger(true);
+	final static DLogger L = new DLogger(true, "MIInfoExtractor");
 	
 	/**************************
 	 * 

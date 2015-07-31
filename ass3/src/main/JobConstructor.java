@@ -25,7 +25,7 @@ import model.NGramFactory;
 
 public class JobConstructor {
 
-	final static DLogger L = new DLogger(true);
+	final static DLogger L = new DLogger(true, "JobConstructor");
 	private final static int MIN_INPUT_ARGS_COUNT = 2;
 
 	/*
