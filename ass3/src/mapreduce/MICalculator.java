@@ -182,13 +182,13 @@ public class MICalculator {
 					T1 = arr[1];
 					ngramCount = arr[2];
 				}
-				else if (type.equals(Constants.WILD_SLOTX_WILD)) {
-					T2 = arr[1];
-					ngramCount = arr[2];
-				}
+				else if (type.equals(Constants.WILD_SLOTX_WILD)) T2 = arr[1];
 				else if (type.equals(Constants.P_SLOTX_WILD))	 T3 = arr[1];
 				else if (type.equals(Constants.WILD_SLOTX_W1)) 	 T4 = arr[1];
-				else if (type.equals(Constants.P_SLOTY_W2)) 	 T5 = arr[1];
+				else if (type.equals(Constants.P_SLOTY_W2)) {
+					T5 = arr[1];
+					ngramCount = arr[2];
+				}
 				else if (type.equals(Constants.WILD_SLOTY_WILD)) T6 = arr[1];
 				else if (type.equals(Constants.P_SLOTY_WILD)) 	 T7 = arr[1];
 				else if (type.equals(Constants.WILD_SLOTY_W2))	 T8 = arr[1];
@@ -204,6 +204,7 @@ public class MICalculator {
 			
 			double mi = 0.0;
 			if (weHaveFullSlotXParams) {
+				
 				mi = PaperHuristics.calculateMI(T1, T2, T3, T4);
 			}
 			else {
