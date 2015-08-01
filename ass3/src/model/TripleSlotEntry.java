@@ -19,6 +19,11 @@ public class TripleSlotEntry {
 		// same class, and equal words.
 		return obj != null && obj instanceof TripleSlotEntry  && this.word.equals(((TripleSlotEntry)obj).word);
 	}
+
+	@Override
+	public String toString() {
+		return word + ", " + count + ", " + mi;
+	}
 	
 	
 }

@@ -16,10 +16,10 @@ import com.amazonaws.services.elasticmapreduce.model.StepConfig;
 
 public class AWSManager {
 
-	private static final String ENG_2GRAMS_PATH = "s3://datasets.elasticmapreduce/ngrams/books/20090715/eng-1M/2gram/data";
+	//private static final String ENG_2GRAMS_PATH = "s3://datasets.elasticmapreduce/ngrams/books/20090715/eng-1M/2gram/data";
 	//private static final String ENG_2GRAMS_PATH = "s3n://mevuzarot.task2/eng-2gram-1m";;
-	private static final String HEB_2GRAMS_PATH = "s3n://mevuzarot.task2/heb-2gram-10K";//"";
-	private static final String OUTPUT_PATH  = "s3n://mevuzarot.task2/output-small/";
+	//private static final String HEB_2GRAMS_PATH = "s3n://mevuzarot.task2/heb-2gram-10K";//"";
+	//private static final String OUTPUT_PATH  = "s3n://mevuzarot.task2/output-small/";
 	
 	public static void main(String[] args) throws Exception {
 		
@@ -37,15 +37,15 @@ public class AWSManager {
 	    AmazonElasticMapReduce mapReduce = new AmazonElasticMapReduceClient(credentials);
 	     
 	    HadoopJarStepConfig hadoopJarStep = new HadoopJarStepConfig()
-	        .withJar("s3n://mevuzarot.task2/ass2.jar") // This should be a full map reduce application.
+	        .withJar("s3n://mevuzarot.task2/ass3.jar") // This should be a full map reduce application.
 	        .withArgs(
-	        		useEnglishFile ? ENG_2GRAMS_PATH : HEB_2GRAMS_PATH,
-	        		OUTPUT_PATH,
+	        		//useEnglishFile ? ENG_2GRAMS_PATH : HEB_2GRAMS_PATH,
+	        		//OUTPUT_PATH,
+	        		"s3n://dsp152/syntactic-ngram/biarcs/biarcs.01-of-99",
+	        		"s3n://mevuzarot.task2/output/",
 	        		minPmi,
 	        		relMinPmi,
-	        		useStopWords,
-	        		"1",
-	        		useEnglishFile ? "eng" : "heb"
+	        		"1"
 	        		);
 	     
 	    StepConfig stepConfig = new StepConfig()
@@ -55,8 +55,8 @@ public class AWSManager {
 	     
 	    JobFlowInstancesConfig instances = new JobFlowInstancesConfig()
 	        .withInstanceCount(6)
-	        .withMasterInstanceType(InstanceType.M1Medium.toString())
-	        .withSlaveInstanceType(InstanceType.M1Medium.toString())
+	        .withMasterInstanceType(InstanceType.M1Xlarge.toString())
+	        .withSlaveInstanceType(InstanceType.M1Xlarge.toString())
 	        .withHadoopVersion("2.4.0")
 	        //.withEc2KeyName(Credentials.KEY_PAIR)
 	        .withKeepJobFlowAliveWhenNoSteps(false)

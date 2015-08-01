@@ -28,20 +28,16 @@ public class JobConstructor {
 	final static DLogger L = new DLogger(true, "JobConstructor");
 	private final static int MIN_INPUT_ARGS_COUNT = 2;
 
-	///*
-	  private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH =
+	
+	  private static String MIINFO_EXTRACTOR_INTERMEDIATE_PATH =
 	  "s3n://mevuzarot.task2/intermediate/mi_info_extractor";
-	private static final String MI_CALCULATOR_INTERMEDIATE_PATH =
+	private static String MI_CALCULATOR_INTERMEDIATE_PATH =
 			"s3n://mevuzarot.task2/intermediate/mi_calculator";
-	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/triple_database";
+	private static String TRIPLE_DATABASE_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/triple_database";
 
-	 //*/
-	/*
-	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_info_extractor";
-	private static final String MI_CALCULATOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_calculator";
-	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH = "/user/hduser/ass3/triple_database";
-
-	*/
+	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH_LOCAL = "/user/hduser/ass3/mi_info_extractor";
+	private static final String MI_CALCULATOR_INTERMEDIATE_PATH_LOCAL = "/user/hduser/ass3/mi_calculator";
+	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH_LOCAL = "/user/hduser/ass3/triple_database";
 
 	private static void test() {
 		String s =  "be	death/NN/nsubj/2 be/VB/ccomp/0 for/IN/prep/2 those/NN/pobj/3	23	1834,2	1889,1	1891,2	1897,3	1906,1	1961,2	1973,1	1977,2	1993,2	2002,1	2005,2	2007,3	2008,1";
@@ -83,6 +79,10 @@ public class JobConstructor {
 		double sim1 = PaperHuristics.calculateSim(e, e);
 		
 		double both = sim + sim1;
+		
+		String s1 = e.toString();
+		String s2 = e2.toString();
+		System.out.println(s1 + s2);
 	}
 	
 	/**
@@ -122,6 +122,12 @@ public class JobConstructor {
 
 		boolean isRunningInCloud = args[4].equals("1");
 
+		if (!isRunningInCloud) {
+			miInforExtractorIntermediatePath = MIINFO_EXTRACTOR_INTERMEDIATE_PATH_LOCAL;
+			miCalculatorIntemediatePath = MI_CALCULATOR_INTERMEDIATE_PATH_LOCAL;
+			tripleDatabaseIntermediatePath = TRIPLE_DATABASE_INTERMEDIATE_PATH_LOCAL;
+		}
+		
 		long startTime;
 		boolean status;
 

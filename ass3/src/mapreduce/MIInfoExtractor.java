@@ -19,7 +19,8 @@ import org.apache.hadoop.mapreduce.lib.partition.HashPartitioner;
 public class MIInfoExtractor {
 
 	final static DLogger L = new DLogger(true, "MIInfoExtractor");
-	
+	final static int LIMIT = 1000*100;
+	static long count = 0;
 	/**************************
 	 * 
 	 * This mapper is incharge of multiple mappings - 
@@ -44,15 +45,24 @@ public class MIInfoExtractor {
 		
 		@Override
 		public void setup(Context context) throws IOException {
-
+			L.log("Setup!!");
 		}
 		
 		@Override
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
+			//if (count++ > LIMIT) {
+			//	return;
+			//}
+			
+			//Val.set("Heyyo");
+			//Key.set("->"+key.toString()+"<-");
+			//context.write(Key, Val);
+			
 			NGram[] ngrams = NGramFactory.parseNGram(value.toString());
-			if (ngrams == null) {
+			if (ngrams == null || ngrams.length == 0) {
+				//L.log("Bad NGRAM ->" + value.toString() +"<-");
 				return;
 			}
 			

@@ -23,4 +23,21 @@ public class TripleEntry {
 	public void addSlotY(TripleSlotEntry slot) {
 		this.slotYs.add(slot);
 	}
+
+	@Override
+	public String toString() {
+		String result = "*******************TripleEntry ("+ slotXs.isEmpty() +", " + slotYs.isEmpty()+ ") of :" + this.path + "\n";
+		result += "SlotXs:\n";
+		for (TripleSlotEntry e : this.slotXs) {
+			result += "Entry : " + e + "\n";
+		}
+		result += "SlotYs:\n";
+		for (TripleSlotEntry e : this.slotYs) {
+			result += "Entry : " + e + "\n";
+		}
+		result += "***************************\n\n";
+		return result;
+	}
+	
+	
 }

@@ -24,6 +24,7 @@ public class TripleDatabaseManufactor {
 		//{"X akhtar Y" + Constants.S + "X akhund Y",
 			//					"X akhtar and Y" + Constants.S + "X akhtar & Y"};
 	final static int MAPPER_INPUT_LENGTH	= 5;
+	final static boolean DEBUG = false;
 	
 	/**
 	 * 
@@ -129,6 +130,17 @@ public class TripleDatabaseManufactor {
 					tripleEntry.addSlotY(slotEntry);
 				}
 			}
+			
+			if (DEBUG) {
+				
+				KEY.set(p1Entry.toString());
+				VAL.set("");
+				context.write(KEY, VAL);
+				KEY.set(p2Entry.toString());
+				VAL.set("");
+				context.write(KEY, VAL);
+			}
+
 			
 			double sim = PaperHuristics.calculateSim(p1Entry, p2Entry);
 			KEY.set(key);
