@@ -7,6 +7,8 @@ import mapreduce.MIInfoExtractor.MIInfoExtractorMapper;
 import mapreduce.MIInfoExtractor.MIInfoExtractorReducer;
 import mapreduce.TripleDatabaseManufactor.TripleDatabaseManufactorMapper;
 import mapreduce.TripleDatabaseManufactor.TripleDatabaseManufactorReducer;
+import model.NGram;
+import model.NGramFactory;
 import model.TripleEntry;
 import model.TripleSlotEntry;
 
@@ -16,6 +18,7 @@ import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.SequenceFileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
 import Utils.DLogger;
@@ -25,22 +28,25 @@ public class JobConstructor {
 	final static DLogger L = new DLogger(true, "JobConstructor");
 	private final static int MIN_INPUT_ARGS_COUNT = 2;
 
-	/*
+	///*
 	  private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH =
 	  "s3n://mevuzarot.task2/intermediate/mi_info_extractor";
 	private static final String MI_CALCULATOR_INTERMEDIATE_PATH =
 			"s3n://mevuzarot.task2/intermediate/mi_calculator";
 	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/triple_database";
 
-	 */
-	///*
+	 //*/
+	/*
 	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_info_extractor";
 	private static final String MI_CALCULATOR_INTERMEDIATE_PATH = "/user/hduser/ass3/mi_calculator";
 	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH = "/user/hduser/ass3/triple_database";
 
-	//*/
+	*/
 
 	private static void test() {
+		String s =  "be	death/NN/nsubj/2 be/VB/ccomp/0 for/IN/prep/2 those/NN/pobj/3	23	1834,2	1889,1	1891,2	1897,3	1906,1	1961,2	1973,1	1977,2	1993,2	2002,1	2005,2	2007,3	2008,1";
+		NGram[] n = NGramFactory.parseNGram(s);
+		
 		TripleEntry e = new TripleEntry("X loves Y");
 		e.addSlotX(new TripleSlotEntry("Hello", 21, 2.0));
 		e.addSlotX(new TripleSlotEntry("World", 45, 2.50));
@@ -88,7 +94,7 @@ public class JobConstructor {
 	 * @throws Exception
 	 */
 	public static void main(String[] args) throws Exception {
-
+		
 		//test();
 		
 		if (args.length < MIN_INPUT_ARGS_COUNT) {
@@ -108,7 +114,6 @@ public class JobConstructor {
 		L.log(" - MIInfoExtractor path: " + miInforExtractorIntermediatePath);
 		L.log(" - MICalculator path: " + miCalculatorIntemediatePath);
 		L.log(" - TripleDatabase path: " + tripleDatabaseIntermediatePath);
-		
 		
 		Configuration conf = new Configuration();
 
@@ -130,10 +135,16 @@ public class JobConstructor {
 		miInfoExtractorJob.setReducerClass(MIInfoExtractorReducer.class);
 
 		// Set Output and Input Parameters
+		miInfoExtractorJob.setInputFormatClass(SequenceFileInputFormat.class);
 		miInfoExtractorJob.setOutputKeyClass(Text.class);
 		miInfoExtractorJob.setOutputValueClass(Text.class);
 
-		FileInputFormat.addInputPath(miInfoExtractorJob, new Path(args[0]));
+		Path[] paths = Utils.Utils.generateInputPaths();
+		if (!isRunningInCloud) {
+			paths = new Path[] {new Path(inputPath)};
+		}
+		
+		FileInputFormat.setInputPaths(miInfoExtractorJob,paths);
 		FileOutputFormat.setOutputPath(miInfoExtractorJob, new Path(
 				miInforExtractorIntermediatePath));
 
@@ -146,7 +157,7 @@ public class JobConstructor {
 		L.log("miInfoExtractorJob Job Finished in "
 				+ (System.currentTimeMillis() - startTime) / 1000.0
 				+ " seconds");
-
+		
 		// Second job
 		Job miCalculatorJob = Job.getInstance(conf);
 		miCalculatorJob.setJobName("miCalculatorJob");
