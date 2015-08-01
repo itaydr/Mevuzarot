@@ -15,8 +15,8 @@ public class NGramFactory {
 	 *  	that/IN/compl/3 patients/NNS/nsubj/3 experience/VB/ccomp/0
 	 */
 	final static int NUMER_OF_OBJECTS_IN_MAIN_ARRAY 	= 3;
-	final static int TOTAL_COUNT_INDEX					= 1;
-	final static int NGRAM_INDEX 						= 0;
+	final static int TOTAL_COUNT_INDEX					= 2;
+	final static int NGRAM_INDEX 						= 1;
 	final static int MIN_SYNTACTIC_NGRAM_LENGTH 		= 3;
 	final static DLogger L 								= new DLogger(true, "NGramFactory");
 	final static String SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR = "  "; // Two spaces.
@@ -32,9 +32,9 @@ public class NGramFactory {
 			return null;
 		}
 		
-		String[] mainArr = ngramStr.split("      ");
+		String[] mainArr = ngramStr.split("	");//("      ");
 		
-		if (mainArr.length != NUMER_OF_OBJECTS_IN_MAIN_ARRAY) {
+		if (mainArr.length < NUMER_OF_OBJECTS_IN_MAIN_ARRAY) {
 			L.log("Less then " + NUMER_OF_OBJECTS_IN_MAIN_ARRAY + " objcts in the NGram array: " + ngramStr);
 			return null;
 		}
@@ -47,14 +47,14 @@ public class NGramFactory {
 		catch (Exception e) {L.log("Failed to parse count: " + countStr + " for ngram: " + ngramStr);}
 		
 		String syntacticNgram = mainArr[NGRAM_INDEX];
-		String[] syntacticNGramWithHeadArr = syntacticNgram.split(SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR);
+		//String[] syntacticNGramWithHeadArr = syntacticNgram.split(SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR);
 		
-		if (syntacticNGramWithHeadArr.length != 2) {
-			L.log("Not enough args with head in ngram " + syntacticNGramWithHeadArr);
-			return null;
-		}
+		//if (syntacticNGramWithHeadArr.length != 2) {
+		//	L.log("Not enough args with head in ngram " + syntacticNGramWithHeadArr);
+		//	return null;
+		//}
 		
-		syntacticNgram = syntacticNGramWithHeadArr[1];
+		//syntacticNgram = syntacticNGramWithHeadArr[1];
 		String[] syntacticNGramArr = syntacticNgram.split(" ");
 		
 		
@@ -108,7 +108,7 @@ public class NGramFactory {
 		}
 		
 		if (slotX == null || slotY == null || path == null || count == 0) {
-			L.log("Failed to parse, one of the objects was not proper: " + ngramStr);
+			//L.log("Failed to parse, one of the objects was not proper: " + ngramStr);
 			return null;
 		}
 		
