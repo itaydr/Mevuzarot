@@ -15,11 +15,14 @@ import org.apache.hadoop.mapreduce.Reducer;
 
 import Utils.Constants;
 import Utils.DLogger;
+import Utils.InputData;
 
 public class TripleDatabaseManufactor {
 	
 	final static DLogger L = new DLogger(true, "TripleDatabaseManufactor");
-	final static String[] Ps = {"X akhtar Y" + Constants.S + "X akhund Y"};
+	final static String[] Ps = InputData.INPUT;
+		//{"X akhtar Y" + Constants.S + "X akhund Y",
+			//					"X akhtar and Y" + Constants.S + "X akhtar & Y"};
 	final static int MAPPER_INPUT_LENGTH	= 5;
 	
 	/**
