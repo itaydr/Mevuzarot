@@ -44,36 +44,36 @@ public class JobConstructor {
 		NGram[] n = NGramFactory.parseNGram(s);
 		
 		TripleEntry e = new TripleEntry("X loves Y");
-		e.addSlotX(new TripleSlotEntry("Hello", 21, 2.0));
-		e.addSlotX(new TripleSlotEntry("World", 45, 2.50));
-		e.addSlotX(new TripleSlotEntry("How", 77, 2.30));
-		e.addSlotX(new TripleSlotEntry("Are", 88, 1.0));
-		e.addSlotX(new TripleSlotEntry("You", 32, 5.0));
-		e.addSlotY(new TripleSlotEntry("WHello", 31, 3.4));
-		e.addSlotY(new TripleSlotEntry("WWorld", 95, 6.50));
-		e.addSlotY(new TripleSlotEntry("WHow", 27, 1.30));
-		e.addSlotY(new TripleSlotEntry("WAre", 83, 7.0));
-		e.addSlotY(new TripleSlotEntry("WYou", 35, 4.3));
+		e.addSlotX(new TripleSlotEntry("Hello", 21, 2.0, 2.0, 2.0));
+		e.addSlotX(new TripleSlotEntry("World", 45, 2.50, 2.50, 2.50));
+		e.addSlotX(new TripleSlotEntry("How", 77, 2.30, 2.30, 2.30));
+		e.addSlotX(new TripleSlotEntry("Are", 88, 1.0, 1.0, 1.0));
+		e.addSlotX(new TripleSlotEntry("You", 32, 5.0, 5.0, 5.0));
+		e.addSlotY(new TripleSlotEntry("WHello", 31, 3.4, 3.4, 3.4));
+		e.addSlotY(new TripleSlotEntry("WWorld", 95, 6.50, 6.50, 6.50));
+		e.addSlotY(new TripleSlotEntry("WHow", 27, 1.30, 1.30, 1.30));
+		e.addSlotY(new TripleSlotEntry("WAre", 83, 7.0, 7.0, 7.0));
+		e.addSlotY(new TripleSlotEntry("WYou", 35, 4.3, 4.3, 4.3));
 		
 		TripleEntry e2 = new TripleEntry("X likes Y");
-		e2.addSlotX(new TripleSlotEntry("Hello", 21, 2.0));
-		e2.addSlotX(new TripleSlotEntry("World", 45, 2.50));
-		e2.addSlotX(new TripleSlotEntry("How", 77, 2.30));
-		e2.addSlotX(new TripleSlotEntry("Are", 88, 1.0));
-		e2.addSlotX(new TripleSlotEntry("sdf", 88, 1.0));
-		e2.addSlotX(new TripleSlotEntry("sdff", 88, 1.0));
+		e2.addSlotX(new TripleSlotEntry("Hello", 21, 2.0, 2.0, 2.0));
+		e2.addSlotX(new TripleSlotEntry("World", 45, 2.50, 2.50, 2.50));
+		e2.addSlotX(new TripleSlotEntry("How", 77, 2.30, 2.30, 2.30));
+		e2.addSlotX(new TripleSlotEntry("Are", 88, 1.0, 1.0, 1.0));
+		e2.addSlotX(new TripleSlotEntry("sdf", 88, 1.0, 1.0, 1.0));
+		e2.addSlotX(new TripleSlotEntry("sdff", 88, 1.0, 1.0, 1.0));
 		
 		
 		
-		e2.addSlotX(new TripleSlotEntry("You", 32, 5.0));
-		e2.addSlotY(new TripleSlotEntry("WHello", 31, 3.4));
-		e2.addSlotY(new TripleSlotEntry("WWorld", 95, 6.50));
+		e2.addSlotX(new TripleSlotEntry("You", 32, 5.0, 5.0, 5.0));
+		e2.addSlotY(new TripleSlotEntry("WHello", 31, 3.4, 3.4, 3.4));
+		e2.addSlotY(new TripleSlotEntry("WWorld", 95, 6.50, 6.50, 6.50));
 		
-		e2.addSlotY(new TripleSlotEntry("dsfssss", 95, 6.50));
+		e2.addSlotY(new TripleSlotEntry("dsfssss", 95, 6.50, 6.50, 6.50));
 		double sim = PaperHuristics.calculateSim(e, e2);
-		e2.addSlotY(new TripleSlotEntry("WHow", 27, 1.30));
-		e2.addSlotY(new TripleSlotEntry("WAre", 83, 7.0));
-		e2.addSlotY(new TripleSlotEntry("WYou", 35, 4.3));
+		e2.addSlotY(new TripleSlotEntry("WHow", 27, 1.30, 1.30, 1.30));
+		e2.addSlotY(new TripleSlotEntry("WAre", 83, 7.0, 7.0, 7.0));
+		e2.addSlotY(new TripleSlotEntry("WYou", 35, 4.3, 4.3, 4.3));
 		
 		
 		double sim1 = PaperHuristics.calculateSim(e, e);

@@ -1,5 +1,6 @@
 package mapreduce;
 
+import huristics.MeniHueristics;
 import huristics.PaperHuristics;
 
 import java.io.IOException;
@@ -223,16 +224,20 @@ public class MICalculator {
 				return;
 			}
 			
-			double mi = 0.0;
+			double mi = 0.0, tfidf = 0.0, dice = 0.0;
 			if (weHaveFullSlotXParams) {
 				mi = PaperHuristics.calculateMI(T1, T2, T3, T4);
+				tfidf = MeniHueristics.calculateTFIDF(T1, T4);
+				dice = MeniHueristics.calculateDice(T1, T4, T3);
 			}
 			else {
 				mi = PaperHuristics.calculateMI(T5, T6, T7, T8);
+				tfidf = MeniHueristics.calculateTFIDF(T5, T8);
+				dice = MeniHueristics.calculateDice(T5, T8, T7);
 			}
 			
 			// Key = <p, slot, w>
-			KEY.set(key.toString() + Constants.S + ngramCount + Constants.S + mi);
+			KEY.set(key.toString() + Constants.S + ngramCount + Constants.S + mi + Constants.S + tfidf + Constants.S + dice);
 			VAL.set("");
 			context.write(KEY, VAL);
 		}

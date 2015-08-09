@@ -6,12 +6,16 @@ public class TripleSlotEntry {
 	public String word;
 	public long count;
 	public double mi;
+	public double tfidf;
+	public double dice;
 	
-	public TripleSlotEntry(String word, long count, double mi) {
+	public TripleSlotEntry(String word, long count, double mi, double tfidf, double dice) {
 		super();
 		this.word 	= word;
 		this.count 	= count;
 		this.mi 	= mi;
+		this.tfidf 	= tfidf;
+		this.dice 	= dice;
 	}
 
 	@Override
@@ -22,7 +26,7 @@ public class TripleSlotEntry {
 
 	@Override
 	public String toString() {
-		return word + ", " + count + ", " + mi;
+		return word + ", " + count + ", " + mi + ", " + tfidf + ", " + dice;
 	}
 	
 	

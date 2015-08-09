@@ -1,5 +1,6 @@
 package mapreduce;
 
+import huristics.MeniHueristics;
 import huristics.PaperHuristics;
 
 import java.io.IOException;
@@ -24,7 +25,7 @@ public class TripleDatabaseManufactor {
 	final static String[] Ps = InputData.INPUT;
 		//{"X akhtar Y" + Constants.S + "X akhund Y",
 			//					"X akhtar and Y" + Constants.S + "X akhtar & Y"};
-	final static int MAPPER_INPUT_LENGTH	= 5;
+	final static int MAPPER_INPUT_LENGTH	= 7;
 	final static boolean DEBUG = false;
 	
 	/**
@@ -106,7 +107,7 @@ public class TripleDatabaseManufactor {
 			}
 			
 			String p1 = arr[0].trim(), p2 = arr[1].trim(), p=null, word=null, slot=null;
-			double mi = 0.0;
+			double mi = 0.0, tfidf = 0.0, dice = 0.0;
 			long count = 0;
 			TripleEntry tripleEntry = null;
 			TripleEntry p1Entry = new TripleEntry(p1);
@@ -123,6 +124,8 @@ public class TripleDatabaseManufactor {
 				try {
 					count = (long) Double.parseDouble(arr[3].trim());
 					mi = Double.parseDouble(arr[4].trim());
+					tfidf = Double.parseDouble(arr[5].trim());
+					dice = Double.parseDouble(arr[6].trim());
 				}catch(Exception e) {
 					L.log("Failed to parse line = " + value + ", arr[3] = " + arr[3] + ", arr[4] = " + arr[4] + e);
 				}
@@ -130,7 +133,7 @@ public class TripleDatabaseManufactor {
 				p = arr[0].trim();
 				slot = arr[1].trim();
 				word = arr[2];
-				slotEntry = new TripleSlotEntry(word, count, mi);
+				slotEntry = new TripleSlotEntry(word, count, mi, tfidf, dice);
 				
 				tripleEntry = p.equals(p1) ? p1Entry : p2Entry;
 				if (slot.equals(Constants.SLOT_X)) {
@@ -149,8 +152,10 @@ public class TripleDatabaseManufactor {
 				
 				L.log("key = " + key);
 				double sim = PaperHuristics.calculateSim(p1Entry, p2Entry);
+				double cosine = MeniHueristics.calculateCosine(p1Entry, p2Entry);
+				double cover = MeniHueristics.calculateCover(p1Entry, p2Entry);
 				KEY.set(key);
-				VAL.set(String.valueOf(sim));
+				VAL.set(String.valueOf(sim) + Constants.S + String.valueOf(cosine) + Constants.S + String.valueOf(cover));
 				context.write(KEY, VAL);
 				
 				if (DEBUG && sim == 0) {
