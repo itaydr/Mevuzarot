@@ -43,7 +43,7 @@ public class MICalculator {
 	 * This mapper accepts as input the out of MIInfoExtractorReducer's output.
 	 * Output - 
 	 * 	1. <p, slotY, w2> -> <type, count> 
-	 * 
+	 *  2. <p, slotX, w1> -> <type, count>
 	 * 
 	 * Input is the initial ngram input files.
 	 */
@@ -53,6 +53,7 @@ public class MICalculator {
 		// Objects for reuse
 		private final static Text Key = new Text();
 		private final static Text Val = new Text();
+		private static double DPMinCount = 0.0;
 		
 		private void emit(Context context, String p, String slot, String w, String identifier, String total, String ngramCount) 
 				throws IOException, InterruptedException {
@@ -60,6 +61,12 @@ public class MICalculator {
 			Val.set(identifier + Constants.S + total + Constants.S + ngramCount);
 			context.write(Key, Val);
 		}
+		
+		@Override
+		public void setup(Context context) throws IOException {
+			DPMinCount = context.getConfiguration().getDouble("DPMinCount", 0.0);
+		}
+		
 				
 		@Override
 		public void map(LongWritable key, Text value, Context context)
@@ -95,7 +102,15 @@ public class MICalculator {
 				String w = arr[4];
 				String count = arr[8];
 				String ngramCount = arr[7];
-				emit(context, p, Constants.SLOT_X, w, Constants.P_SLOTX_WILD, count,ngramCount);
+				
+				double countDouble = 0.0;
+				try {
+					countDouble = Double.parseDouble(count);
+				}catch(Exception e){}
+				
+				if (countDouble > DPMinCount) {
+					emit(context, p, Constants.SLOT_X, w, Constants.P_SLOTX_WILD, count,ngramCount);
+				}
 			}
 			else if (type.equals(Constants.WILD_SLOTX_W1)) {
 				if (arr.length != WILD_SLOTX_W1_LENGTH) {L.log("Bad length (" + arr.length + ")" + value); return;}
@@ -120,7 +135,6 @@ public class MICalculator {
 				String count = arr[8];
 				String ngramCount = arr[7];
 				emit(context, p, Constants.SLOT_Y, w, Constants.WILD_SLOTY_WILD, count,ngramCount);
-			
 			}
 			else if (type.equals(Constants.P_SLOTY_WILD)) {
 				if (arr.length != P_SLOTY_WILD_LENGTH) {L.log("Bad length (" + arr.length + ")" + value); return;}
@@ -128,8 +142,15 @@ public class MICalculator {
 				String w = arr[5];
 				String ngramCount = arr[7];
 				String count = arr[8];
-				emit(context, p, Constants.SLOT_Y, w, Constants.P_SLOTY_WILD, count,ngramCount);
-			
+				
+				double countDouble = 0.0;
+				try {
+					countDouble = Double.parseDouble(count);
+				}catch(Exception e){}
+				
+				if (countDouble > DPMinCount) {
+					emit(context, p, Constants.SLOT_Y, w, Constants.P_SLOTY_WILD, count,ngramCount);
+				}
 			}
 			else if (type.equals(Constants.WILD_SLOTY_W2)) {
 				if (arr.length != WILD_SLOTY_W2_LENGTH) {L.log("Bad length (" + arr.length + ")" + value); return;}
@@ -177,7 +198,7 @@ public class MICalculator {
 					L.log("Bad situation MICalculatorReducer: " + key + " , " + value);
 					continue;
 				}
-				type = arr[0];
+				type = arr[0].trim();
 				if (type.equals(Constants.P_SLOTX_W1)) {
 					T1 = arr[1];
 					ngramCount = arr[2];
@@ -204,7 +225,6 @@ public class MICalculator {
 			
 			double mi = 0.0;
 			if (weHaveFullSlotXParams) {
-				
 				mi = PaperHuristics.calculateMI(T1, T2, T3, T4);
 			}
 			else {

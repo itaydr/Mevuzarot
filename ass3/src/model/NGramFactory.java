@@ -113,10 +113,10 @@ public class NGramFactory {
 		}
 		
 		NGram ngram1 = new NGram(Constants.SLOT_X + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_Y, slotX, slotY, count);
-		NGram ngram2 = new NGram(Constants.SLOT_Y + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_X, slotY, slotX, count);
-		NGram[] result = new NGram[2];
+		//NGram ngram2 = new NGram(Constants.SLOT_Y + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_X, slotY, slotX, count);
+		NGram[] result = new NGram[1];
 		result[0] = ngram1;
-		result[1] = ngram2;
+		//result[1] = ngram2;
 		
 		return result;
 	}

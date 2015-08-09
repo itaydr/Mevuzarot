@@ -35,9 +35,9 @@ public class JobConstructor {
 			"s3n://mevuzarot.task2/intermediate/mi_calculator";
 	private static String TRIPLE_DATABASE_INTERMEDIATE_PATH = "s3n://mevuzarot.task2/intermediate/triple_database";
 
-	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH_LOCAL = "/user/hduser/ass3/mi_info_extractor";
-	private static final String MI_CALCULATOR_INTERMEDIATE_PATH_LOCAL = "/user/hduser/ass3/mi_calculator";
-	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH_LOCAL = "/user/hduser/ass3/triple_database";
+	private static final String MIINFO_EXTRACTOR_INTERMEDIATE_PATH_LOCAL = "/user/hduser/mi_info_extractor";
+	private static final String MI_CALCULATOR_INTERMEDIATE_PATH_LOCAL = "/user/hduser/mi_calculator";
+	private static final String TRIPLE_DATABASE_INTERMEDIATE_PATH_LOCAL = "/user/hduser/triple_database";
 
 	private static void test() {
 		String s =  "be	death/NN/nsubj/2 be/VB/ccomp/0 for/IN/prep/2 those/NN/pobj/3	23	1834,2	1889,1	1891,2	1897,3	1906,1	1961,2	1973,1	1977,2	1993,2	2002,1	2005,2	2007,3	2008,1";
@@ -141,7 +141,9 @@ public class JobConstructor {
 		miInfoExtractorJob.setReducerClass(MIInfoExtractorReducer.class);
 
 		// Set Output and Input Parameters
-		miInfoExtractorJob.setInputFormatClass(SequenceFileInputFormat.class);
+		//if (isRunningInCloud) {
+			miInfoExtractorJob.setInputFormatClass(SequenceFileInputFormat.class);
+		//}
 		miInfoExtractorJob.setOutputKeyClass(Text.class);
 		miInfoExtractorJob.setOutputValueClass(Text.class);
 

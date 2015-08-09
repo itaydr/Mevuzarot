@@ -12,6 +12,7 @@ import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapreduce.Mapper;
 import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.Mapper.Context;
 
 import Utils.Constants;
 import Utils.DLogger;
@@ -57,12 +58,13 @@ public class TripleDatabaseManufactor {
 				return;
 			}
 			
-			String p = arr[0];
+			String p = arr[0].trim();
 			for (String pair : Ps) {
 				int index = pair.indexOf(p);
 				if (index != -1) {
 					Key.set(pair);
 					Val.set(value);
+					//L.log("key = " + pair + ", val = " + value);
 					context.write(Key, Val);
 				}
 			}
@@ -84,10 +86,18 @@ public class TripleDatabaseManufactor {
 		// Reuse objects
 		private final static Text KEY = new Text();
 		private final static Text VAL = new Text();
+		private static double MinFeatureNum = 0.0;
 
+		@Override
+		public void setup(Context context) throws IOException {
+			MinFeatureNum = context.getConfiguration().getDouble("MinFeatureNum", 0.0);
+		}
+		
 		@Override
 		public void reduce(Text key, Iterable<Text> values,
 				Context context) throws IOException, InterruptedException {
+			
+			//L.log("key = " + key);
 			
 			String[] arr = key.toString().trim().split(Constants.S);
 			if (arr.length != 2) {
@@ -131,21 +141,28 @@ public class TripleDatabaseManufactor {
 				}
 			}
 			
-			if (DEBUG) {
+			// Filter
+			if (p1Entry.slotXs.size() > MinFeatureNum && 
+				p1Entry.slotYs.size() > MinFeatureNum && 
+				p2Entry.slotXs.size() > MinFeatureNum && 
+				p2Entry.slotYs.size() > MinFeatureNum) {
 				
-				KEY.set(p1Entry.toString());
-				VAL.set("");
+				L.log("key = " + key);
+				double sim = PaperHuristics.calculateSim(p1Entry, p2Entry);
+				KEY.set(key);
+				VAL.set(String.valueOf(sim));
 				context.write(KEY, VAL);
-				KEY.set(p2Entry.toString());
-				VAL.set("");
-				context.write(KEY, VAL);
+				
+				if (DEBUG && sim == 0) {
+					
+					KEY.set(p1Entry.toString());
+					VAL.set("");
+					context.write(KEY, VAL);
+					KEY.set(p2Entry.toString());
+					VAL.set("");
+					context.write(KEY, VAL);
+				}	
 			}
-
-			
-			double sim = PaperHuristics.calculateSim(p1Entry, p2Entry);
-			KEY.set(key);
-			VAL.set(String.valueOf(sim));
-			context.write(KEY, VAL);
 		}
 	}
 }
