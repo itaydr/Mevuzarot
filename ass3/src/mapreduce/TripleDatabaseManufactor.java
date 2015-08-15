@@ -26,7 +26,7 @@ public class TripleDatabaseManufactor {
 		//{"X akhtar Y" + Constants.S + "X akhund Y",
 			//					"X akhtar and Y" + Constants.S + "X akhtar & Y"};
 	final static int MAPPER_INPUT_LENGTH	= 7;
-	final static boolean DEBUG = true;
+	final static boolean DEBUG = false;
 	
 	/**
 	 * 
