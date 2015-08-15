@@ -4,7 +4,7 @@ import org.apache.hadoop.fs.Path;
 
 public class Utils {
 	
-	private final static int NUMBER_OF_INPUT_PATHS = 99;
+	private final static int NUMBER_OF_INPUT_PATHS = 20;
 	
 	public static Path[] generateInputPaths() {
 		Path[] paths = new Path[NUMBER_OF_INPUT_PATHS];

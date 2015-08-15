@@ -1,6 +1,8 @@
 package mapreduce;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 
 import model.NGram;
 import model.NGramFactory;
@@ -21,6 +23,7 @@ public class MIInfoExtractor {
 	final static DLogger L = new DLogger(true, "MIInfoExtractor");
 	final static int LIMIT = 1000*100;
 	static long count = 0;
+	static long every = 50;
 	/**************************
 	 * 
 	 * This mapper is incharge of multiple mappings - 
@@ -60,22 +63,27 @@ public class MIInfoExtractor {
 			//Key.set("->"+key.toString()+"<-");
 			//context.write(Key, Val);
 			
-			NGram[] ngrams = NGramFactory.parseNGram(value.toString());
-			if (ngrams == null || ngrams.length == 0) {
-				//L.log("Bad NGRAM ->" + value.toString() +"<-");
-				return;
+			try {
+				ArrayList<NGram> ngrams = NGramFactory.parse(value.toString());
+				if (ngrams == null || ngrams.size() == 0) {
+					//L.log("Bad NGRAM ->" + value.toString() +"<-");
+					return;
+				}
+				
+				for (int i = 0 ; i < ngrams.size() ; i++) {
+					NGram ngram = ngrams.get(i);
+					emitSlotX(context, ngram); // 1
+					emitSlotY(context, ngram); // 2
+					emitSlotCount(context, ngram, Constants.SLOT_X, Constants.WILD_SLOTX_WILD); // 3 
+					emitSlotCount(context, ngram, Constants.SLOT_Y, Constants.WILD_SLOTY_WILD); // 4
+					emitWordCountInSlotForPath(context, ngram, Constants.SLOT_X, Constants.P_SLOTX_WILD); // 5
+					emitWordCountInSlotForPath(context, ngram, Constants.SLOT_Y, Constants.P_SLOTY_WILD); // 6
+					emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_X, ngram.slotX, Constants.WILD_SLOTX_W1); // 7
+					emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_Y, ngram.slotY, Constants.WILD_SLOTY_W2); // 8
+				}
 			}
-			
-			for (int i = 0 ; i < ngrams.length ; i++) {
-				NGram ngram = ngrams[i];
-				emitSlotX(context, ngram); // 1
-				emitSlotY(context, ngram); // 2
-				emitSlotCount(context, ngram, Constants.SLOT_X, Constants.WILD_SLOTX_WILD); // 3 
-				emitSlotCount(context, ngram, Constants.SLOT_Y, Constants.WILD_SLOTY_WILD); // 4
-				emitWordCountInSlotForPath(context, ngram, Constants.SLOT_X, Constants.P_SLOTX_WILD); // 5
-				emitWordCountInSlotForPath(context, ngram, Constants.SLOT_Y, Constants.P_SLOTY_WILD); // 6
-				emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_X, ngram.slotX, Constants.WILD_SLOTX_W1); // 7
-				emitPathCountForSlotAndWord(context, ngram, Constants.SLOT_Y, ngram.slotY, Constants.WILD_SLOTY_W2); // 8
+			catch(Exception e) {
+				L.log("Exception" + e);
 			}
 		}
 		

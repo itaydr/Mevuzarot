@@ -57,20 +57,20 @@ public class MeniHueristics {
 		
 		double sumTFIDFOfMutualItems = 0.0;
 		for (TripleSlotEntry entry : mutualSlot1) {
-			sumTFIDFOfMutualItems += entry.mi;
+			sumTFIDFOfMutualItems += entry.tfidf;
 		}
 		for (TripleSlotEntry entry : mutualSlot2) {
-			sumTFIDFOfMutualItems += entry.mi;
+			sumTFIDFOfMutualItems += entry.tfidf;
 		}
 		
 		double sumOf1 = 0.0;
 		for (TripleSlotEntry entry : tripleSlots1) {
-			sumOf1 += entry.mi;
+			sumOf1 += entry.tfidf;
 		}
 		
 		double sumOf2 = 0.0;
 		for (TripleSlotEntry entry : tripleSlots2) {
-			sumOf2 += entry.mi;
+			sumOf2 += entry.tfidf;
 		}
 		
 		double divBy = Math.sqrt(sumOf1*sumOf1) + Math.sqrt(sumOf2*sumOf2);
@@ -102,8 +102,8 @@ public class MeniHueristics {
 	public static double calculateCover(TripleEntry triple1, TripleEntry triple2) {
 		double cover = 0.0;
 		
-		double slotXsCover = MeniHueristics.calculateCosine(triple1.slotXs, triple2.slotXs);
-		double slotYsCover = MeniHueristics.calculateCosine(triple1.slotYs, triple2.slotYs);
+		double slotXsCover = MeniHueristics.calculateCover(triple1.slotXs, triple2.slotXs);
+		double slotYsCover = MeniHueristics.calculateCover(triple1.slotYs, triple2.slotYs);
 		
 		try {
 			cover = Math.sqrt(slotXsCover*slotYsCover);
@@ -130,15 +130,15 @@ public class MeniHueristics {
 		
 		double sumDiceOfMutualItems = 0.0;
 		for (TripleSlotEntry entry : mutualSlot1) {
-			sumDiceOfMutualItems += entry.mi;
+			sumDiceOfMutualItems += entry.dice;
 		}
 		for (TripleSlotEntry entry : mutualSlot2) {
-			sumDiceOfMutualItems += entry.mi;
+			sumDiceOfMutualItems += entry.dice;
 		}
 		
 		double sumOf1 = 0.0;
 		for (TripleSlotEntry entry : tripleSlots1) {
-			sumOf1 += entry.mi;
+			sumOf1 += entry.dice;
 		}
 		
 		double divBy = sumOf1;

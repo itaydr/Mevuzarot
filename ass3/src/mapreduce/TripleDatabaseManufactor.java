@@ -26,16 +26,16 @@ public class TripleDatabaseManufactor {
 		//{"X akhtar Y" + Constants.S + "X akhund Y",
 			//					"X akhtar and Y" + Constants.S + "X akhtar & Y"};
 	final static int MAPPER_INPUT_LENGTH	= 7;
-	final static boolean DEBUG = false;
+	final static boolean DEBUG = true;
 	
 	/**
 	 * 
 	 * Input - @see MICalculatorReducer. Can accept any of it's outputs.
-	 *  	1. <p, slotX, w1, count, mi>
-	 *  	2. <p, slotY, w2, count, mi>
+	 *  	1. <p, slotX, w1, count, mi, tfidf, dice>
+	 *  	2. <p, slotY, w2, count, mi, tfidf, dice>
 	 * 	
 	 * Output - 
-	 * 		<p1, p2> -> <slot, w, count, mi>
+	 * 		<p1, p2> -> <slot, w, count, mi, tfidf, dice>
 	 * 		One line of out for each pair that contains this p.
 	 * 
 	 * @author asaf
@@ -158,14 +158,10 @@ public class TripleDatabaseManufactor {
 				VAL.set(String.valueOf(sim) + Constants.S + String.valueOf(cosine) + Constants.S + String.valueOf(cover));
 				context.write(KEY, VAL);
 				
-				if (DEBUG && sim == 0) {
+				if (DEBUG) {
 					
-					KEY.set(p1Entry.toString());
-					VAL.set("");
-					context.write(KEY, VAL);
-					KEY.set(p2Entry.toString());
-					VAL.set("");
-					context.write(KEY, VAL);
+					L.log(p1Entry.toString());
+					L.log(p2Entry.toString());
 				}	
 			}
 		}

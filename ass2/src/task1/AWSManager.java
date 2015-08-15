@@ -54,9 +54,9 @@ public class AWSManager {
 	        .withActionOnFailure("TERMINATE_JOB_FLOW");
 	     
 	    JobFlowInstancesConfig instances = new JobFlowInstancesConfig()
-	        .withInstanceCount(4)
-	        .withMasterInstanceType(InstanceType.M1Large.toString())
-	        .withSlaveInstanceType(InstanceType.M1Large.toString())
+	        .withInstanceCount(7)
+	        .withMasterInstanceType(InstanceType.M1Xlarge.toString())
+	        .withSlaveInstanceType(InstanceType.M1Xlarge.toString())
 	        .withHadoopVersion("2.4.0")
 	        //.withEc2KeyName(Credentials.KEY_PAIR)
 	        .withKeepJobFlowAliveWhenNoSteps(false)

@@ -1,5 +1,11 @@
 package model;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.StringTokenizer;
+
 import Utils.Constants;
 import Utils.DLogger;
 
@@ -25,7 +31,7 @@ public class NGramFactory {
 	final static String VERB_PREFIX 					= "VB";
 	final static int INDEX_OF_HEAD_WORD					= 0;
 		
-	public static NGram[] parseNGram(String ngramStr) {
+	public static ArrayList<NGram> parseNGram(String ngramStr) {
 		
 		if (ngramStr == null) {
 			L.log("Cannot parse null string.");
@@ -47,14 +53,7 @@ public class NGramFactory {
 		catch (Exception e) {L.log("Failed to parse count: " + countStr + " for ngram: " + ngramStr);}
 		
 		String syntacticNgram = mainArr[NGRAM_INDEX];
-		//String[] syntacticNGramWithHeadArr = syntacticNgram.split(SYNTACTIC_NGRAM_HEAD_SPLIT_CHAR);
-		
-		//if (syntacticNGramWithHeadArr.length != 2) {
-		//	L.log("Not enough args with head in ngram " + syntacticNGramWithHeadArr);
-		//	return null;
-		//}
-		
-		//syntacticNgram = syntacticNGramWithHeadArr[1];
+
 		String[] syntacticNGramArr = syntacticNgram.split(" ");
 		
 		
@@ -114,62 +113,151 @@ public class NGramFactory {
 		
 		NGram ngram1 = new NGram(Constants.SLOT_X + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_Y, slotX, slotY, count);
 		//NGram ngram2 = new NGram(Constants.SLOT_Y + Constants.SPACE + path + Constants.SPACE + Constants.SLOT_X, slotY, slotX, count);
-		NGram[] result = new NGram[1];
-		result[0] = ngram1;
+		ArrayList<NGram> result = new ArrayList<NGram>();
+		result.add(ngram1);
 		//result[1] = ngram2;
 		
 		return result;
 	}
 	
-	private static boolean isWordVerb(String parsedWord) {
-		String type = NGramFactory.wordTypeFromString(parsedWord);
-		return type.startsWith(VERB_PREFIX);
+	private static boolean isNoun(String type) {
+		return type.length() > 1 && type.substring(0, 2).equalsIgnoreCase("NN");
 	}
 	
-	private static boolean isWordNoun(String parsedWord) {
-		String type = NGramFactory.wordTypeFromString(parsedWord);
-		return type.startsWith(NOUN_PREFIX);
-	}
-	
-	private static String wordTypeFromString(String parsedWord) {
-		String[] parts = parsedWord.trim().split(PARSED_WORD_SPLIT_CHAR);
-		if (parts.length < 4) {
-			return "";
+	public static ArrayList<NGram> parse(String input) {
+		
+		ArrayList<NGram> output = new ArrayList<NGram>();
+		StringTokenizer tokenizer = new StringTokenizer(input, "\t");
+		tokenizer.nextToken();
+		String ngram = tokenizer.nextToken();
+		int count = Integer.parseInt(tokenizer.nextToken());
+		
+		String[] splitted = ngram.toString().trim().split("\\s+");
+				
+		int root = -1;
+		
+		int size = 0;
+		for (int i = 0; i < splitted.length; i++) {
+			String[] subs = splitted[i].toString().trim().split("\\/");
+			if (subs.length == 4)
+				size++;
+		}
+		String[][] words = new String[size+1][3];
+		int index = 1;
+		
+		for (int i = 1; i <=  splitted.length; i++) {
+			String[] subs = splitted[i-1].toString().trim().split("\\/");		
+			if (subs.length != 4) {
+				return output;
+			}
+			
+			if (subs[3].equals("0")) {
+				if (subs[1].length() < 2 || !subs[1].substring(0, 2).equalsIgnoreCase("VB")) {
+					return output;
+				}
+				root = i;
+			}
+			
+			words[index][0] = subs[0];
+			words[index][1] = subs[1];
+			words[index][2] = subs[3];
+			index++;
 		}
 		
-		return parts[1]; 
+		if (root < 0) {
+			return output;
+		}
+		
+		for (int i = 1; i < words.length; i++) {
+			
+			if (!isNoun(words[i][1])) 
+				continue;
+			
+			for (int j = i+1; j < words.length; j++) {
+				if (isNoun(words[j][1]))  {
+					String[] paths = makePaths(i, j, root, words);
+					if (paths != null) {
+
+						NGram ng = new NGram(paths[0], words[i][0], words[j][0], count);
+						output.add(ng);
+						
+						ng = new NGram(paths[1], words[j][0], words[i][0], count);
+						output.add(ng);
+					}
+				}
+			}
+		}
+		
+		return output;
 	}
-	
-	private static String slotYFromSyntacticNGramStr(String[] syntacticNGramArr) {
-		if (syntacticNGramArr == null || syntacticNGramArr.length == 0) {
-			L.log("Cannot fetch slotY from empty array.");
+		
+	private static String[] makePaths(int i, int j, int root, String[][] words) throws NumberFormatException {
+		String[] pathArr = new String[words.length + 1];
+		String[] ans = new String[2];
+		int counter = 0;
+		
+		int index = Integer.parseInt(words[i][2]);
+		while (index != root) {
+			pathArr[index] = words[index][0];
+			index = Integer.parseInt(words[index][2]);
+			counter++;
+			if (counter > 15) {
+				return null;
+			}
+		}
+		
+		if (pathArr[j] != null)
 			return null;
+		
+		counter = 0;
+		
+		index = Integer.parseInt(words[j][2]);
+		while (index != root) {
+			pathArr[index] = words[index][0];
+			index = Integer.parseInt(words[index][2]);
+			counter++;
+			if (counter > 15) {
+				return null;
+			}
 		}
 		
-		return syntacticNGramArr[syntacticNGramArr.length-1];
+		pathArr[i] = Constants.SLOT_X;
+		pathArr[j] = Constants.SLOT_Y;
+		pathArr[root] = words[root][0];
+
+		String path = "";
+		for (int k = 0; k < pathArr.length; k++) {
+			path += (pathArr[k] == null) ? "" : pathArr[k] + " ";
+		}
+		
+		ans[0] = path;
+		
+		pathArr[i] = Constants.SLOT_Y;
+		pathArr[j] = Constants.SLOT_X;
+		
+		path = "";
+		for (int k = 0; k < pathArr.length; k++) {
+			path += (pathArr[k] == null) ? "" : pathArr[k] + " ";
+		}
+		
+		ans[1] = path;
+		return ans;
 	}
 	
-	private static String slotXFromSyntacticNGramStr(String[] syntacticNGramArr) {
-		if (syntacticNGramArr == null || syntacticNGramArr.length == 0) {
-			L.log("Cannot fetch slotX from empty array.");
-			return null;
-		}
-		
-		// TODO: fetch real slotX.
-		return syntacticNGramArr[0];
-	}
 	
-	private static String pathFromSyntacticNGramStr(String[] syntacticNGramArr) {
-		if (syntacticNGramArr == null || syntacticNGramArr.length < 3) {
-			L.log("Cannot fetch path from array " + syntacticNGramArr);
-			return null;
-		}
-		
-		String acc = "";
-		for (int i = 1 ; i < syntacticNGramArr.length-1 ; i++) {
-			acc += syntacticNGramArr[i] + " ";
-		}
-		
-		return acc;
+	public static void main(String[] args) {
+	String s="begin	first/NN/advmod/2 begin/VB/advcl/0 care/NN/xcomp/2	19	1887,3	1912,2	1968,2	2004,5	2007,2	2008,5";
+	
+	try {
+		//while ((sCurrentLine = br.readLine()) != null) {
+			ArrayList<NGram> ngrams = parse(s);
+			for (NGram ngram  : ngrams) {
+				L.log("Ngram = " + ngram);
+			}
+		//}
+	} catch (Exception e) {
+		// TODO Auto-generated catch block
+		e.printStackTrace();
 	}
+}
 }

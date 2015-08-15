@@ -173,8 +173,8 @@ public class MICalculator {
 	 * Input - @see MICalculatorMapper. Can accept any of it's outputs.
 	 * 
 	 * Output - 
-	 * 		1. <p, slotX, w1, count, mi>
-	 *  	2. <p, slotY, w2, count, mi>
+	 * 		1. <p, slotX, w1, count, mi, tfidf, dice>
+	 *  	2. <p, slotY, w2, count, mi, tfidf, dice>
 	 * 	
 	 * @author asaf
 	 *
