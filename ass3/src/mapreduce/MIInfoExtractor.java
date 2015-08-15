@@ -55,18 +55,13 @@ public class MIInfoExtractor {
 		public void map(LongWritable key, Text value, Context context)
 				throws IOException, InterruptedException {
 
-			//if (count++ > LIMIT) {
-			//	return;
-			//}
-			
-			//Val.set("Heyyo");
-			//Key.set("->"+key.toString()+"<-");
-			//context.write(Key, Val);
+			if (count++ % every != 0) {
+				return;
+			}
 			
 			try {
 				ArrayList<NGram> ngrams = NGramFactory.parse(value.toString());
 				if (ngrams == null || ngrams.size() == 0) {
-					//L.log("Bad NGRAM ->" + value.toString() +"<-");
 					return;
 				}
 				
@@ -193,7 +188,5 @@ public class MIInfoExtractor {
 				sum = 0;
 			}
 		}
-	}
-	
-	
+	}	
 }
