@@ -3,7 +3,7 @@ package Utils;
 
 public class InputData {
 	
-	public static String[] BAD_INPUT = new String[] {
+	public static String[] INPUT = new String[] {
 		
 		"X expose to Y" + Constants.S + "X protect from Y",
 		"X differ from Y" + Constants.S + "Y resemble X",
@@ -103,10 +103,10 @@ public class InputData {
 		"X convert to Y" + Constants.S + "Y convert to X",
 		"X have Y" + Constants.S + "Y kill X",
 		"X differentiate from Y" + Constants.S + "Y mimic X",
-		"X get Y" + Constants.S + "X die from Y"
-	};
-	
-	public static String[] GOOD_INPUT = new String[] {
+		"X get Y" + Constants.S + "X die from Y",
+		
+		// Good input start here
+
 		
 		"X confuse with Y" + Constants.S + "Y confound with X",
 		"X release into Y" + Constants.S + "X secrete into Y",
@@ -2589,8 +2589,5 @@ public class InputData {
 		"X cause by Y" + Constants.S + "Y associate with X",
 		"X follow Y" + Constants.S + "Y precede X",
 		"X unite with Y" + Constants.S + "Y combine with X"
-	};
-	
-	public static String[] INPUT = GOOD_INPUT;
-	
+	};	
 }
