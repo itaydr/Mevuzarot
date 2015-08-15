@@ -56,24 +56,28 @@ public class MeniHueristics {
 		mutualSlot2.retainAll(tripleSlots1);
 		
 		double sumTFIDFOfMutualItems = 0.0;
+		TripleSlotEntry tmp = null;
 		for (TripleSlotEntry entry : mutualSlot1) {
-			sumTFIDFOfMutualItems += entry.tfidf;
-		}
-		for (TripleSlotEntry entry : mutualSlot2) {
-			sumTFIDFOfMutualItems += entry.tfidf;
+			try {
+				tmp = mutualSlot2.get(mutualSlot2.indexOf(entry));
+				sumTFIDFOfMutualItems += entry.tfidf * tmp.tfidf;
+			}
+			catch (Exception e) {
+				L.log("calculateCosine failed to parse");
+			}
 		}
 		
 		double sumOf1 = 0.0;
 		for (TripleSlotEntry entry : tripleSlots1) {
-			sumOf1 += entry.tfidf;
+			sumOf1 += entry.tfidf*entry.tfidf;
 		}
 		
 		double sumOf2 = 0.0;
 		for (TripleSlotEntry entry : tripleSlots2) {
-			sumOf2 += entry.tfidf;
+			sumOf2 += entry.tfidf*entry.tfidf;
 		}
 		
-		double divBy = Math.sqrt(sumOf1*sumOf1) + Math.sqrt(sumOf2*sumOf2);
+		double divBy = Math.sqrt(sumOf1) * Math.sqrt(sumOf2);
 		if (divBy != 0) {
 			cos = sumTFIDFOfMutualItems/divBy;
 		}
@@ -130,9 +134,6 @@ public class MeniHueristics {
 		
 		double sumDiceOfMutualItems = 0.0;
 		for (TripleSlotEntry entry : mutualSlot1) {
-			sumDiceOfMutualItems += entry.dice;
-		}
-		for (TripleSlotEntry entry : mutualSlot2) {
 			sumDiceOfMutualItems += entry.dice;
 		}
 		
