@@ -5,7 +5,7 @@ public class Constants {
 	public final static String SPACE = " ";
 	public final static String WILDCARD = "*";
 	public final static String S = "      ";
-	// TODO: revert to tab?. 
+	
 	public static final String LOWEST_ASCII = "      "; // TAB = 9
 	public final static String SLOT_X = "X";
 	public final static String SLOT_Y = "Y";

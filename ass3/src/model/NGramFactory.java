@@ -38,26 +38,26 @@ public class NGramFactory {
 	public static ArrayList<NGram> parse(String input) {
 		
 		ArrayList<NGram> output = new ArrayList<NGram>();
-		StringTokenizer tokenizer = new StringTokenizer(input, "\t");
-		tokenizer.nextToken();
-		String ngram = tokenizer.nextToken();
-		int count = Integer.parseInt(tokenizer.nextToken());
+		StringTokenizer tok = new StringTokenizer(input, "\t");
+		tok.nextToken();
+		String ngram = tok.nextToken();
+		int count = Integer.parseInt(tok.nextToken());
 		
-		String[] splitted = ngram.toString().trim().split("\\s+");
+		String[] splitArray = ngram.toString().trim().split("\\s+");
 				
-		int root = -1;
+		int rootIndex = -1;
 		
 		int size = 0;
-		for (int i = 0; i < splitted.length; i++) {
-			String[] subs = splitted[i].toString().trim().split("\\/");
+		for (int i = 0; i < splitArray.length; i++) {
+			String[] subs = splitArray[i].toString().trim().split("\\/");
 			if (subs.length == 4)
 				size++;
 		}
 		Word[] words = new Word[size+1];
 		int index = 1;
 		
-		for (int i = 1; i <=  splitted.length; i++) {
-			String[] subs = splitted[i-1].toString().trim().split("\\/");		
+		for (int i = 1; i <=  splitArray.length; i++) {
+			String[] subs = splitArray[i-1].toString().trim().split("\\/");		
 			if (subs.length != 4) {
 				return output;
 			}
@@ -66,14 +66,14 @@ public class NGramFactory {
 				if (subs[1].length() < 2 || !subs[1].substring(0, 2).equalsIgnoreCase(VERB_PREFIX)) {
 					return output;
 				}
-				root = i;
+				rootIndex = i;
 			}
 			
 			words[index] =  new Word(subs[0], subs[1], subs[3]);
 			index++;
 		}
 		
-		if (root < 0) {
+		if (rootIndex < 0) {
 			return output;
 		}
 		
@@ -84,7 +84,7 @@ public class NGramFactory {
 			
 			for (int j = i+1; j < words.length; j++) {
 				if (isNoun(words[j].type))  {
-					String[] paths = makePaths(i, j, root, words);
+					String[] paths = makePaths(i, j, rootIndex, words);
 					if (paths != null) {
 
 						NGram ng = new NGram(paths[0], words[i].data, words[j].data, count);
@@ -100,16 +100,17 @@ public class NGramFactory {
 		return output;
 	}
 		
-	private static String[] makePaths(int i, int j, int root, Word[] words) throws NumberFormatException {
+	private static String[] makePaths(int i, int j, int rootIndex, Word[] words) throws NumberFormatException {
 		String[] pathArr = new String[words.length + 1];
 		String[] ans = new String[2];
 		int counter = 0;
 		
 		int index = Integer.parseInt(words[i].node);
-		while (index != root) {
+		while (index != rootIndex) {
 			pathArr[index] = words[index].data;
 			index = Integer.parseInt(words[index].node);
 			counter++;
+			//limit
 			if (counter > 15) {
 				return null;
 			}
@@ -121,10 +122,11 @@ public class NGramFactory {
 		counter = 0;
 		
 		index = Integer.parseInt(words[j].node);
-		while (index != root) {
+		while (index != rootIndex) {
 			pathArr[index] = words[index].data;
 			index = Integer.parseInt(words[index].node);
 			counter++;
+			// limit
 			if (counter > 15) {
 				return null;
 			}
@@ -132,7 +134,7 @@ public class NGramFactory {
 		
 		pathArr[i] = Constants.SLOT_X;
 		pathArr[j] = Constants.SLOT_Y;
-		pathArr[root] = words[root].data;
+		pathArr[rootIndex] = words[rootIndex].data;
 
 		String path = "";
 		for (int k = 0; k < pathArr.length; k++) {
@@ -153,20 +155,20 @@ public class NGramFactory {
 		return ans;
 	}
 	
-	
 	public static void main(String[] args) {
-	String s="begin	first/NN/advmod/2 begin/VB/advcl/0 care/NN/xcomp/2	19	1887,3	1912,2	1968,2	2004,5	2007,2	2008,5";
+		String s="begin	first/NN/advmod/2 begin/VB/advcl/0 care/NN/xcomp/2	19	1887,3	1912,2	1968,2	2004,5	2007,2	2008,5";
 	
-	try {
-		//while ((sCurrentLine = br.readLine()) != null) {
+		try {
+			//while ((sCurrentLine = br.readLine()) != null) {
 			ArrayList<NGram> ngrams = parse(s);
 			for (NGram ngram  : ngrams) {
 				L.log("Ngram = " + ngram);
 			}
-		//}
-	} catch (Exception e) {
-		// TODO Auto-generated catch block
-		e.printStackTrace();
+			//}
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
-}
+
 }
